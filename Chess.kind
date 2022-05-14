@@ -1,0 +1,179 @@
+App.Chess.State: App.State
+  App.State.new(App.Chess.State.Local, App.Chess.State.Global)
+
+type App.Chess.State.Local {
+  new(
+    mouse_pos: Pair<U32, U32>
+    selected:  Maybe<Pair<Nat, Nat>>
+    team:      Bits
+  )
+}
+
+type App.Chess.State.Global {
+  new(
+    turn: Nat
+    board: List<List<Maybe<App.Chess.Piece>>>
+  )
+}
+
+type App.Chess.Piece.Color {
+    white
+    black
+}
+
+type App.Chess.Piece.Class {
+    pawn
+    rook
+    knight
+    bishop
+    queen
+    king
+}
+
+type App.Chess.Piece {
+  new(class: App.Chess.Piece.Class, color: App.Chess.Piece.Color)
+}
+
+App.Chess.scale: U32
+  2
+
+App.Chess.tile_size: U32
+  32#32
+
+App.Chess.make_piece(class: App.Chess.Piece.Class, color: App.Chess.Piece.Color) : Maybe<App.Chess.Piece>
+    some(App.Chess.Piece.new(class, color))
+
+// Initial state
+App.Chess.init: App.Init<App.Chess.State>
+  let turn = 0
+  let mouse_pos = {0#32 0#32}
+  let selected  = none
+  let team      = Bits.o(Bits.e)
+  let local     = App.Chess.State.Local.new(mouse_pos, selected, team)
+  let r = App.Chess.Piece.Class.rook
+  let n = App.Chess.Piece.Class.knight
+  let b = App.Chess.Piece.Class.bishop
+  let q = App.Chess.Piece.Class.queen
+  let k = App.Chess.Piece.Class.king
+  let p = App.Chess.Piece.Class.pawn
+  let black = App.Chess.Piece.Color.black
+  let white = App.Chess.Piece.Color.white
+  let mk_b = (class: App.Chess.Piece.Class) App.Chess.make_piece(class, black)
+  let mk_w = (class: App.Chess.Piece.Class) App.Chess.make_piece(class, white) 
+  let global =
+      App.Chess.State.Global.new(0, 
+        [
+          [mk_b(r), mk_b(n), mk_b(b), mk_b(q), mk_b(k), mk_b(b), mk_b(n), mk_b(r)]
+          [mk_b(p), mk_b(p), mk_b(p), mk_b(p), mk_b(p), mk_b(p), mk_b(p), mk_b(p)]
+          [none,    none,    none,    none,    none,    none,    none,    none   ]
+          [none,    none,    none,    none,    none,    none,    none,    none   ]
+          [none,    none,    none,    none,    none,    none,    none,    none   ]
+          [none,    none,    none,    none,    none,    none,    none,    none   ]
+          [mk_w(p), mk_w(p), mk_w(p), mk_w(p), mk_w(p), mk_w(p), mk_w(p), mk_w(p)]
+          [mk_w(r), mk_w(n), mk_w(b), mk_w(q), mk_w(k), mk_w(b), mk_w(n), mk_w(r)]
+        ])
+  App.Store.new<App.Chess.State>(local, global)
+
+App.Chess.get(row: Nat, column: Nat, game: App.Chess.State.Global): Maybe<App.Chess.Piece>
+    open game
+    game.board[column][row] <> none
+
+App.Chess.canvas(local: App.Chess.State.Local, game: App.Chess.State.Global, img: VoxBox): VoxBox
+  open game
+  let board = game.board
+  let size = App.Chess.tile_size
+  for i from 0 to 64 with img:
+    let x = i % 8
+    let y = i / 8
+    let is_black_tile = Nat.odd(x + y)
+    let draw = VoxBox.Draw.image(((Nat.to_u32(x) * size) - (size * 4)) + size / 2, ((Nat.to_u32(y) * size) - (size * 4)) + size / 2)
+    let img = if not(is_black_tile) then draw(0, App.Checkers.White_Tile, img) else draw(0, App.Checkers.Black_Tile, img)
+    let tile = App.Chess.get(x, y, game)
+    case tile {
+      none: 
+        img
+      some:
+        open tile.value
+        if tile.value.color =? App.Chess.Piece.Color.black then 
+          switch App.Chess.Piece.Class.eql(tile.value.class) {
+            App.Chess.Piece.Class.rook:   draw(1, App.Checkers.Black_Queen, img)
+            App.Chess.Piece.Class.knight: draw(1, App.Checkers.Black_Queen, img)
+            App.Chess.Piece.Class.bishop: draw(1, App.Checkers.Black_Queen, img)
+            App.Chess.Piece.Class.queen:  draw(1, App.Checkers.Black_Queen, img)
+            App.Chess.Piece.Class.king:   draw(1, App.Checkers.Black_Queen, img)
+            App.Chess.Piece.Class.pawn:   draw(1, App.Checkers.Black_Normal, img)
+          } default img
+        else 
+          switch App.Chess.Piece.Class.eql(tile.value.class) {
+            App.Chess.Piece.Class.rook:   draw(1, App.Checkers.Red_Queen, img)
+            App.Chess.Piece.Class.knight: draw(1, App.Checkers.Red_Queen, img)
+            App.Chess.Piece.Class.bishop: draw(1, App.Checkers.Red_Queen, img)
+            App.Chess.Piece.Class.queen:  draw(1, App.Checkers.Red_Queen, img)
+            App.Chess.Piece.Class.king:   draw(1, App.Checkers.Red_Queen, img)
+            App.Chess.Piece.Class.pawn:   draw(1, App.Checkers.Red_Normal, img)
+          } default img
+    }    
+  img
+
+App.Chess.Piece.Class.eql(a: App.Chess.Piece.Class, b: App.Chess.Piece.Class): Bool
+  case a b {
+    pawn pawn: true
+    rook rook: true
+    knight knight: true
+    bishop bishop: true
+    queen queen: true
+    king king: true 
+  } default false
+
+App.Chess.Piece.Color.eql(a: App.Chess.Piece.Color, b: App.Chess.Piece.Color): Bool
+  case a b {
+    black black: true
+    white white: true
+  } default false
+
+
+// Render function
+App.Chess.draw(img: VoxBox): App.Draw<App.Chess.State>
+  (state)
+  let local  = state@local
+  let global = state@global
+  // Updates canvas
+  let new_img = App.Chess.canvas(local, global, img)
+  <div>
+    {
+    DOM.vbox(
+      {
+        "id": "game_screen",
+        "width": "256"
+        "height": "256"
+        "scale": U32.show(App.Chess.scale)
+      }, {}, new_img)
+    }
+  </div>
+
+// Event handler
+App.Chess.when: App.When<App.Chess.State>
+  (event, state)
+  case event {
+    init: App.pass!
+  } default App.pass!
+
+// Global ticker 
+App.Chess.tick: App.Tick<App.Chess.State>
+  App.no_tick<App.Chess.State>
+
+// Global visitor
+App.Chess.post: App.Post<App.Chess.State>
+  (time, room, addr, data, glob)
+  glob
+
+// A "Chess, world!" + counter application
+App.Chess: App<App.Chess.State>
+  let img = VoxBox.alloc_capacity(65536*8)
+  App.new<App.Chess.State>(
+    App.Chess.init
+    App.Chess.draw(img)
+    App.Chess.when
+    App.Chess.tick
+    App.Chess.post
+  )
