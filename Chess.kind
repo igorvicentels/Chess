@@ -1,5 +1,5 @@
 App.Chess.State: App.State
-  App.State.new(App.Chess.State.Local, App.Chess.State.Global)
+  App.State.new(App.Chess.State.Local, App.Chess.Board)
 
 type App.Chess.State.Local {
   new(
@@ -9,39 +9,38 @@ type App.Chess.State.Local {
   )
 }
 
-type App.Chess.State.Global {
-  new(
-    turn: Nat
-    board: List<List<Maybe<App.Chess.Piece>>>
-  )
-}
+App.Chess.Board: Type
+  List<Bits>
 
-type App.Chess.Piece.Color {
-    white
-    black
-}
-
-type App.Chess.Piece.Class {
-    pawn
-    rook
-    knight
-    bishop
-    queen
-    king
-}
-
-type App.Chess.Piece {
-  new(class: App.Chess.Piece.Class, color: App.Chess.Piece.Color)
-}
+App.Chess.room: String
+  "Chess_room_001"
 
 App.Chess.scale: U32
   2
 
 App.Chess.tile_size: U32
-  32#32
+  64#32
 
-App.Chess.make_piece(class: App.Chess.Piece.Class, color: App.Chess.Piece.Color) : Maybe<App.Chess.Piece>
-    some(App.Chess.Piece.new(class, color))
+
+// 010101111001101111011001011101010011001100110011001100110011
+// 001100000000000000000000000000000000000000000000000000000000
+// 000000000000000000000000000000000000000000000000000000000000
+// 000000000000001000100010001000100010001000100100011010001010
+// 110010000110010000000000000000000000000000000000000000000000
+
+// empty        -> 0000
+// black pawn   -> 0011
+// black rook   -> 0101
+// black knight -> 0111
+// black bishop -> 1001
+// black queen  -> 1011
+// black king   -> 1101
+// white pawn   -> 0010
+// white rook   -> 0100
+// white knight -> 0110
+// white bishop -> 1000
+// white queen  -> 1010
+// white king   -> 1100
 
 // Initial state
 App.Chess.init: App.Init<App.Chess.State>
@@ -49,88 +48,82 @@ App.Chess.init: App.Init<App.Chess.State>
   let mouse_pos = {0#32 0#32}
   let selected  = none
   let team      = Bits.o(Bits.e)
+  let chunk0    = Bits.trim(60, Nat.to_bits(394554900005204787))
+  let chunk1    = Bits.trim(60, Nat.to_bits(216172782113783808))
+  let chunk2    = Bits.trim(60, Nat.to_bits(0))
+  let chunk3    = Bits.trim(60, Nat.to_bits(37529996904074))
+  let chunk4    = Bits.trim(60, Nat.to_bits(902479144078540800))
   let local     = App.Chess.State.Local.new(mouse_pos, selected, team)
-  let r = App.Chess.Piece.Class.rook
-  let n = App.Chess.Piece.Class.knight
-  let b = App.Chess.Piece.Class.bishop
-  let q = App.Chess.Piece.Class.queen
-  let k = App.Chess.Piece.Class.king
-  let p = App.Chess.Piece.Class.pawn
-  let black = App.Chess.Piece.Color.black
-  let white = App.Chess.Piece.Color.white
-  let mk_b = (class: App.Chess.Piece.Class) App.Chess.make_piece(class, black)
-  let mk_w = (class: App.Chess.Piece.Class) App.Chess.make_piece(class, white) 
-  let global =
-      App.Chess.State.Global.new(0, 
-        [
-          [mk_b(r), mk_b(n), mk_b(b), mk_b(q), mk_b(k), mk_b(b), mk_b(n), mk_b(r)]
-          [mk_b(p), mk_b(p), mk_b(p), mk_b(p), mk_b(p), mk_b(p), mk_b(p), mk_b(p)]
-          [none,    none,    none,    none,    none,    none,    none,    none   ]
-          [none,    none,    none,    none,    none,    none,    none,    none   ]
-          [none,    none,    none,    none,    none,    none,    none,    none   ]
-          [none,    none,    none,    none,    none,    none,    none,    none   ]
-          [mk_w(p), mk_w(p), mk_w(p), mk_w(p), mk_w(p), mk_w(p), mk_w(p), mk_w(p)]
-          [mk_w(r), mk_w(n), mk_w(b), mk_w(q), mk_w(k), mk_w(b), mk_w(n), mk_w(r)]
-        ])
+  let global    = [chunk0, chunk1, chunk2, chunk3, chunk4]
   App.Store.new<App.Chess.State>(local, global)
 
-App.Chess.get(row: Nat, column: Nat, game: App.Chess.State.Global): Maybe<App.Chess.Piece>
-    open game
-    game.board[column][row] <> none
+App.Chess.get_chunk(index: Nat, board: App.Chess.Board): Bits
+  let chunk = 
+    if index <? 60 then
+      case board[0] {
+        none: Nat.to_bits(0)
+        some: self.value
+      }
+    else if index <? 120 then  
+      case board[1] {
+        none: Nat.to_bits(0)
+        some: self.value
+      }
+    else if index <? 180 then
+      case board[2] {
+        none: Nat.to_bits(0)
+        some: self.value
+      }
+    else if index <? 240 then
+      case board[3] {
+        none: Nat.to_bits(0)
+        some: self.value
+      }
+    else
+      case board[4] {
+        none: Nat.to_bits(0)
+        some: self.value
+      }
+  chunk
 
-App.Chess.canvas(local: App.Chess.State.Local, game: App.Chess.State.Global, img: VoxBox): VoxBox
-  open game
-  let board = game.board
+App.Chess.get(x: Nat, y: Nat, board: App.Chess.Board): Bits
+  let tile_size = 4 :: Nat
+  let index = (x * tile_size) + (y * 8 * tile_size)
+  let chunk = App.Chess.get_chunk(index, board)
+  let tile = Bits.slice(tile_size, Bits.drop(56 - index % 60, chunk))
+  tile
+      
+
+App.Chess.canvas(local: App.Chess.State.Local, board: App.Chess.Board, img: VoxBox): VoxBox
   let size = App.Chess.tile_size
   for i from 0 to 64 with img:
     let x = i % 8
     let y = i / 8
     let is_black_tile = Nat.odd(x + y)
-    let draw = VoxBox.Draw.image(((Nat.to_u32(x) * size) - (size * 4)) + size / 2, ((Nat.to_u32(y) * size) - (size * 4)) + size / 2)
-    let img = if not(is_black_tile) then draw(0, App.Checkers.White_Tile, img) else draw(0, App.Checkers.Black_Tile, img)
-    let tile = App.Chess.get(x, y, game)
-    case tile {
-      none: 
-        img
-      some:
-        open tile.value
-        if tile.value.color =? App.Chess.Piece.Color.black then 
-          switch App.Chess.Piece.Class.eql(tile.value.class) {
-            App.Chess.Piece.Class.rook:   draw(1, App.Checkers.Black_Queen, img)
-            App.Chess.Piece.Class.knight: draw(1, App.Checkers.Black_Queen, img)
-            App.Chess.Piece.Class.bishop: draw(1, App.Checkers.Black_Queen, img)
-            App.Chess.Piece.Class.queen:  draw(1, App.Checkers.Black_Queen, img)
-            App.Chess.Piece.Class.king:   draw(1, App.Checkers.Black_Queen, img)
-            App.Chess.Piece.Class.pawn:   draw(1, App.Checkers.Black_Normal, img)
-          } default img
-        else 
-          switch App.Chess.Piece.Class.eql(tile.value.class) {
-            App.Chess.Piece.Class.rook:   draw(1, App.Checkers.Red_Queen, img)
-            App.Chess.Piece.Class.knight: draw(1, App.Checkers.Red_Queen, img)
-            App.Chess.Piece.Class.bishop: draw(1, App.Checkers.Red_Queen, img)
-            App.Chess.Piece.Class.queen:  draw(1, App.Checkers.Red_Queen, img)
-            App.Chess.Piece.Class.king:   draw(1, App.Checkers.Red_Queen, img)
-            App.Chess.Piece.Class.pawn:   draw(1, App.Checkers.Red_Normal, img)
-          } default img
-    }    
-  img
-
-App.Chess.Piece.Class.eql(a: App.Chess.Piece.Class, b: App.Chess.Piece.Class): Bool
-  case a b {
-    pawn pawn: true
-    rook rook: true
-    knight knight: true
-    bishop bishop: true
-    queen queen: true
-    king king: true 
-  } default false
-
-App.Chess.Piece.Color.eql(a: App.Chess.Piece.Color, b: App.Chess.Piece.Color): Bool
-  case a b {
-    black black: true
-    white white: true
-  } default false
-
+    let draw = VoxBox.Draw.image(((Nat.to_u32(x) * size) - 128) + size / 2, ((Nat.to_u32(y) * size) - 128) + size / 2)
+    let draw_tile = VoxBox.Draw.rect(Nat.to_u32(x) * size, Nat.to_u32(y) * size, 0, 64, 64)
+    let img = if not(is_black_tile) then draw_tile(Col32.new(100,100,100,255), img) else draw_tile(Col32.new(255,255,255,255), img)
+    let tile = App.Chess.get(x, y, board)
+    switch Bits.eql(tile) {
+      Bits.o(Bits.o(Bits.o(Bits.o(Bits.e)))): img
+      Bits.o(Bits.i(Bits.o(Bits.o(Bits.e)))): draw(2, App.Chess.whitepawn, img)
+      Bits.o(Bits.o(Bits.i(Bits.o(Bits.e)))): draw(2, App.Chess.whiterook, img)
+      Bits.o(Bits.i(Bits.i(Bits.o(Bits.e)))): draw(2, App.Chess.whiteknight, img)
+      Bits.o(Bits.o(Bits.o(Bits.i(Bits.e)))): draw(2, App.Chess.whitebishop, img)
+      Bits.o(Bits.i(Bits.o(Bits.i(Bits.e)))): draw(2, App.Chess.whitequeen, img)
+      Bits.o(Bits.o(Bits.i(Bits.i(Bits.e)))): draw(2, App.Chess.whiteking, img)
+      Bits.i(Bits.i(Bits.o(Bits.o(Bits.e)))): draw(2, App.Chess.blackpawn, img)
+      Bits.i(Bits.o(Bits.i(Bits.o(Bits.e)))): draw(2, App.Chess.blackrook, img)
+      Bits.i(Bits.i(Bits.i(Bits.o(Bits.e)))): draw(2, App.Chess.blackknight, img)
+      Bits.i(Bits.o(Bits.o(Bits.i(Bits.e)))): draw(2, App.Chess.blackbishop, img)
+      Bits.i(Bits.i(Bits.o(Bits.i(Bits.e)))): draw(2, App.Chess.blackqueen, img)
+      Bits.i(Bits.o(Bits.i(Bits.i(Bits.e)))): draw(2, App.Chess.blackking, img)
+    } default img
+  let selected = local@selected   
+  without selected: img
+  let {x, y} = {Nat.to_u32(selected@fst), Nat.to_u32(selected@snd)}
+  let draw_outline = VoxBox.Draw.rect(x * size, y * size, 0, 64, 64, Col32.new(100,100,100,100), img)
+  draw_outline
 
 // Render function
 App.Chess.draw(img: VoxBox): App.Draw<App.Chess.State>
@@ -144,30 +137,302 @@ App.Chess.draw(img: VoxBox): App.Draw<App.Chess.State>
     DOM.vbox(
       {
         "id": "game_screen",
-        "width": "256"
-        "height": "256"
+        "width": U32.show(App.Chess.tile_size * 8)
+        "height": U32.show(App.Chess.tile_size * 8)
         "scale": U32.show(App.Chess.scale)
       }, {}, new_img)
     }
   </div>
 
+App.Chess.next_player(board: App.Chess.Board): Bits
+    case board[4] {
+      none: Bits.o(Bits.e) // TODO: Check if this is a bug
+      some: Bits.slice(1, self.value)
+    }
+
+App.Chess.is_move_possible(x0: Nat, y0: Nat, x1: Nat, y1: Nat, team: Bits, board: App.Chess.Board): Bool
+  let origin_tile   = App.Chess.get(x0, y0, board)
+  let to_tile       = App.Chess.get(x1, y1, board)
+  let player        = App.Chess.next_player(board)
+  let is_tile_empty = Bits.eql(origin_tile, Bits.o(Bits.o(Bits.o(Bits.o(Bits.e)))))
+  if is_tile_empty then
+    false
+  else
+    let piece_owner       = Bits.slice(1, origin_tile)
+    let is_piece_owner    = Bits.eql(piece_owner, team)
+    let is_user_turn      = Bits.eql(piece_owner, App.Chess.next_player(board))
+    let is_to_tile_empty  = Bits.eql(to_tile, Bits.o(Bits.o(Bits.o(Bits.o(Bits.e)))))
+    let is_to_tile_player = Bits.eql(Bits.slice(1, to_tile), team) 
+    log(List.show!(Bool.show, [is_piece_owner, is_user_turn, is_to_tile_empty, is_to_tile_player]))
+    if is_piece_owner && is_user_turn && (is_to_tile_empty || Bool.not(is_to_tile_player)) then
+      switch Bits.eql(origin_tile) {
+        Bits.o(Bits.i(Bits.o(Bits.o(Bits.e)))): App.Chess.is_move_possible_pawn(x0, y0, x1, y1, is_to_tile_empty, piece_owner, board)
+        Bits.o(Bits.o(Bits.i(Bits.o(Bits.e)))): App.Chess.is_move_possible_rook(x0, y0, x1, y1, board)
+        Bits.o(Bits.i(Bits.i(Bits.o(Bits.e)))): App.Chess.is_move_possible_knight(Nat.to_int(x0), Nat.to_int(y0), Nat.to_int(x1), Nat.to_int(y1), board)
+        Bits.o(Bits.o(Bits.o(Bits.i(Bits.e)))): App.Chess.is_move_possible_bishop(Nat.to_int(x0), Nat.to_int(y0), Nat.to_int(x1), Nat.to_int(y1), board)
+        Bits.o(Bits.i(Bits.o(Bits.i(Bits.e)))): App.Chess.is_move_possible_queen(x0, y0, x1, y1, board)
+        Bits.o(Bits.o(Bits.i(Bits.i(Bits.e)))): App.Chess.is_move_possible_king(Nat.to_int(x0), Nat.to_int(y0), Nat.to_int(x1), Nat.to_int(y1), board)
+        Bits.i(Bits.i(Bits.o(Bits.o(Bits.e)))): App.Chess.is_move_possible_pawn(x0, y0, x1, y1, is_to_tile_empty, piece_owner, board)
+        Bits.i(Bits.o(Bits.i(Bits.o(Bits.e)))): App.Chess.is_move_possible_rook(x0, y0, x1, y1, board)
+        Bits.i(Bits.i(Bits.i(Bits.o(Bits.e)))): App.Chess.is_move_possible_knight(Nat.to_int(x0), Nat.to_int(y0), Nat.to_int(x1), Nat.to_int(y1), board)
+        Bits.i(Bits.o(Bits.o(Bits.i(Bits.e)))): App.Chess.is_move_possible_bishop(Nat.to_int(x0), Nat.to_int(y0), Nat.to_int(x1), Nat.to_int(y1), board)
+        Bits.i(Bits.i(Bits.o(Bits.i(Bits.e)))): App.Chess.is_move_possible_queen(x0, y0, x1, y1, board)
+        Bits.i(Bits.o(Bits.i(Bits.i(Bits.e)))): App.Chess.is_move_possible_king(Nat.to_int(x0), Nat.to_int(y0), Nat.to_int(x1), Nat.to_int(y1), board)
+      } default false
+    else
+      false
+
+App.Chess.is_move_possible_pawn(x0: Nat, y0: Nat, x1: Nat, y1: Nat, is_to_tile_empty: Bool, piece_owner: Bits, board: App.Chess.Board) : Bool
+  if Bits.eql(piece_owner, Bits.o(Bits.e)) then
+    if is_to_tile_empty then 
+      if Nat.eql(y0, 6) then 
+        Nat.eql(x0, x1) && (Nat.eql((y0 - y1), 1) || Nat.eql((y0 - y1), 2))
+      else
+        Nat.eql(x0, x1) && Nat.eql((y0 - y1), 1)
+    else
+      (Nat.eql(x0 - x1, 1) || Nat.eql(x1 - x0, 1)) && Nat.eql((y0 - y1), 1)
+  else 
+    if is_to_tile_empty then
+      if Nat.eql(y0, 1) then
+        Nat.eql(x0, x1) && (Nat.eql((y1 - y0), 1) || Nat.eql((y1 - y0), 2))
+      else
+        Nat.eql(x0, x1) && Nat.eql((y1 - y0), 1)
+    else
+      (Nat.eql(x1 - x0, 1) || Nat.eql(x0 - x1, 1)) && Nat.eql((y1 - y0), 1)
+    
+App.Chess.is_move_possible_rook(x0: Nat, y0: Nat, x1: Nat, y1: Nat, board: App.Chess.Board): Bool
+  if Bool.not(Nat.eql(x0, x1) || Nat.eql(y0, y1)) then
+    false
+  else
+    if Nat.ltn(x0, x1) then
+      App.Chess.is_move_possible_rook_aux1(x0 + 1, y0, x1 - 1, y1, board)
+    else if Nat.ltn(x1, x0) then
+      App.Chess.is_move_possible_rook_aux2(x0 - 1, y0, x1 + 1, y1, board)
+    else if Nat.ltn(y0, y1) then
+      App.Chess.is_move_possible_rook_aux3(x0, y0 + 1, x1, y1 - 1, board)
+    else
+      App.Chess.is_move_possible_rook_aux4(x0, y0 - 1, x1, y1 + 1, board)
+
+App.Chess.is_move_possible_rook_aux1(x0: Nat, y0: Nat, x1: Nat, y1: Nat, board: App.Chess.Board): Bool
+  if Nat.gtn(x0, x1) then
+    true
+  else 
+    if Bits.eql(App.Chess.get(x1, y1, board), Bits.o(Bits.o(Bits.o(Bits.o(Bits.e)))))
+    && Bits.eql(App.Chess.get(x0, y0, board), Bits.o(Bits.o(Bits.o(Bits.o(Bits.e))))) then
+      App.Chess.is_move_possible_rook_aux1(x0 + 1, y0, x1 - 1, y1, board)
+    else
+      false
+
+App.Chess.is_move_possible_rook_aux2(x0: Nat, y0: Nat, x1: Nat, y1: Nat, board: App.Chess.Board): Bool
+  if Nat.ltn(x0, x1) then
+    true
+  else 
+    if Bits.eql(App.Chess.get(x1, y1, board), Bits.o(Bits.o(Bits.o(Bits.o(Bits.e)))))
+    && Bits.eql(App.Chess.get(x0, y0, board), Bits.o(Bits.o(Bits.o(Bits.o(Bits.e))))) then
+      App.Chess.is_move_possible_rook_aux2(x0 - 1, y0, x1 + 1, y1, board)
+    else
+      false
+
+App.Chess.is_move_possible_rook_aux3(x0: Nat, y0: Nat, x1: Nat, y1: Nat, board: App.Chess.Board): Bool
+  if Nat.gtn(y0, y1) then
+    true
+  else 
+    if Bits.eql(App.Chess.get(x1, y1, board), Bits.o(Bits.o(Bits.o(Bits.o(Bits.e)))))
+    && Bits.eql(App.Chess.get(x0, y0, board), Bits.o(Bits.o(Bits.o(Bits.o(Bits.e))))) then
+      App.Chess.is_move_possible_rook_aux3(x0, y0 + 1, x1, y1 - 1, board)
+    else
+      false
+  
+App.Chess.is_move_possible_rook_aux4(x0: Nat, y0: Nat, x1: Nat, y1: Nat, board: App.Chess.Board): Bool
+  if Nat.ltn(y0, y1) then
+    true
+  else 
+    if Bits.eql(App.Chess.get(x1, y1, board), Bits.o(Bits.o(Bits.o(Bits.o(Bits.e)))))
+    && Bits.eql(App.Chess.get(x0, y0, board), Bits.o(Bits.o(Bits.o(Bits.o(Bits.e))))) then
+      App.Chess.is_move_possible_rook_aux4(x0, y0 - 1, x1, y1 + 1, board)
+    else
+      false
+
+
+App.Chess.is_move_possible_knight(x0: Int, y0: Int, x1: Int, y1: Int, board: App.Chess.Board): Bool
+  (Nat.eql(Int.abs(x0 - x1), 2) && Nat.eql(Int.abs(y0 - y1), 1)) || (Nat.eql(Int.abs(x0 - x1), 1) && Nat.eql(Int.abs(y0 - y1), 2))
+
+App.Chess.is_move_possible_bishop(x0: Int, y0: Int, x1: Int, y1: Int, board: App.Chess.Board): Bool
+  if Bool.not(Nat.eql(Int.abs(x0 - x1), Int.abs(y0 - y1))) then
+    false
+  else
+    if Int.ltn(x0, x1) && Int.ltn(y0, y1) then
+      App.Chess.is_move_possible_bishop_aux1(x0 + 1, y0 + 1, x1 - 1, y1 - 1, board)   
+    else if Int.ltn(x0, x1) && Int.ltn(y1, y0) then
+      App.Chess.is_move_possible_bishop_aux2(x0 + 1, y0 - 1, x1 - 1, y1 + 1, board)
+    else if Int.ltn(x1, x0) && Int.ltn(y0, y1) then
+      App.Chess.is_move_possible_bishop_aux3(x0 - 1, y0 + 1, x1 + 1, y1 - 1, board)
+    else
+      App.Chess.is_move_possible_bishop_aux4(x0 - 1, y0 - 1, x1 + 1, y1 + 1, board)
+
+App.Chess.is_move_possible_bishop_aux1(x0: Int, y0: Int, x1: Int, y1: Int, board: App.Chess.Board): Bool
+  if Int.gtn(x0, x1) then
+    true
+  else
+    if Bits.eql(App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board), Bits.o(Bits.o(Bits.o(Bits.o(Bits.e)))))
+      && Bits.eql(App.Chess.get(Int.to_nat(x0), Int.to_nat(y0), board), Bits.o(Bits.o(Bits.o(Bits.o(Bits.e))))) then
+      App.Chess.is_move_possible_bishop_aux1(x0 + 1, y0 + 1, x1 - 1, y1 - 1, board)
+    else
+      false
+
+App.Chess.is_move_possible_bishop_aux2(x0: Int, y0: Int, x1: Int, y1: Int, board: App.Chess.Board): Bool
+  if Int.gtn(x0, x1) then
+    true
+  else
+    if Bits.eql(App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board), Bits.o(Bits.o(Bits.o(Bits.o(Bits.e))))) 
+      && Bits.eql(App.Chess.get(Int.to_nat(x0), Int.to_nat(y0), board), Bits.o(Bits.o(Bits.o(Bits.o(Bits.e)))))then
+      App.Chess.is_move_possible_bishop_aux1(x0 + 1, y0 - 1, x1 - 1, y1 + 1, board)
+    else
+      false
+
+App.Chess.is_move_possible_bishop_aux3(x0: Int, y0: Int, x1: Int, y1: Int, board: App.Chess.Board): Bool
+  if Int.ltn(x0, x1) then
+    true
+  else
+    if Bits.eql(App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board), Bits.o(Bits.o(Bits.o(Bits.o(Bits.e))))) 
+    && Bits.eql(App.Chess.get(Int.to_nat(x0), Int.to_nat(y0), board), Bits.o(Bits.o(Bits.o(Bits.o(Bits.e))))) then
+      App.Chess.is_move_possible_bishop_aux1(x0 - 1, y0 + 1, x1 + 1, y1 - 1, board)
+    else
+      false
+
+App.Chess.is_move_possible_bishop_aux4(x0: Int, y0: Int, x1: Int, y1: Int, board: App.Chess.Board): Bool
+  if Int.ltn(x0, x1) then
+    true
+  else
+    if Bits.eql(App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board), Bits.o(Bits.o(Bits.o(Bits.o(Bits.e))))) 
+    && Bits.eql(App.Chess.get(Int.to_nat(x0), Int.to_nat(y0), board), Bits.o(Bits.o(Bits.o(Bits.o(Bits.e)))))then
+      App.Chess.is_move_possible_bishop_aux1(x0 - 1, y0 - 1, x1 + 1, y1 + 1, board)
+    else
+      false
+
+App.Chess.is_move_possible_queen(x0: Nat, y0: Nat, x1: Nat, y1: Nat, board: App.Chess.Board): Bool
+  App.Chess.is_move_possible_rook(x0, y0, x1, y1, board) ||
+  App.Chess.is_move_possible_bishop(Nat.to_int(x0), Nat.to_int(y0), Nat.to_int(x1), Nat.to_int(y1), board)
+
+App.Chess.is_move_possible_king(x0: Int, y0: Int, x1: Int, y1: Int, board: App.Chess.Board): Bool
+  Nat.lte(Int.abs(x0 - x1), 1) && Nat.lte(Int.abs(y0 - y1), 1)
+
+
+App.Chess.move(code: Bits, board: App.Chess.Board): App.Chess.Board
+  let team = Bits.slice(1,code)
+  let x0   = Bits.slice(3,Bits.drop(1,code))
+  let y0   = Bits.slice(3,Bits.drop(4,code))
+  let x1   = Bits.slice(3,Bits.drop(7,code))
+  let y1   = Bits.slice(3,Bits.drop(10,code))
+  let is_possible = App.Chess.is_move_possible(Bits.to_nat(x0), Bits.to_nat(y0), Bits.to_nat(x1), Bits.to_nat(y1), team, board)
+  if is_possible then App.Chess.move.aux(Bits.to_nat(x0), Bits.to_nat(y0), Bits.to_nat(x1), Bits.to_nat(y1), team, board) else board
+
+App.Chess.move.aux(x0: Nat, y0: Nat, x1: Nat, y1: Nat, team: Bits, board: App.Chess.Board): App.Chess.Board
+  let tile_size  = 4 :: Nat
+  let from_index = (x0 * tile_size) + (y0 * 8 * tile_size)
+  let from_chunk = App.Chess.get_chunk(from_index, board) 
+  let from_tile = Bits.slice(4, Bits.drop(56 - from_index % 60, from_chunk))
+  let new_tile = Bits.o(Bits.o(Bits.o(Bits.o(Bits.e))))
+  let from_chunk = Bits.set(56 - from_index % 60, new_tile, from_chunk)
+  let new_board = 
+    if from_index <? 60 then
+        board[0] <- from_chunk 
+      else if from_index <? 120 then  
+        board[1] <- from_chunk
+      else if from_index <? 180 then
+        board[2] <- from_chunk
+      else if from_index <? 240 then
+        board[3] <- from_chunk
+      else
+        board[4] <- from_chunk
+  
+  let to_index = (x1 * tile_size) + (y1 * 8 * tile_size)
+  let to_chunk = App.Chess.get_chunk(to_index, new_board)
+  let to_chunk = Bits.set(56 - to_index % 60, from_tile, to_chunk)
+  let new_board = 
+    if to_index <? 60 then
+        new_board[0] <- to_chunk 
+      else if to_index <? 120 then  
+        new_board[1] <- to_chunk
+      else if to_index <? 180 then
+        new_board[2] <- to_chunk
+      else if to_index <? 240 then
+        new_board[3] <- to_chunk
+      else
+        new_board[4] <- to_chunk
+
+  let last_chunk = new_board[4]
+  case last_chunk {
+    none: new_board
+    some: 
+      let last_chunk = Bits.set(0, Bits.not(team), last_chunk.value)
+      let new_board = new_board[4] <- last_chunk
+      new_board
+  }
+  // let last_chunk = Bits.set(0, Bits.not(team), last_chunk.value)      
+  // // new_board[4] <- last_chunk
+  // new_board
+
+App.Chess.mouse_to_coord(mouse_pos: Pair<U32, U32>): Pair<Nat, Nat>
+  let scale     = App.Chess.scale
+  let tile_size = App.Chess.tile_size
+  let x = mouse_pos@fst / (scale * tile_size)
+  let y = mouse_pos@snd / (scale * tile_size)
+  {U32.to_nat(x), U32.to_nat(y)}
+
 // Event handler
 App.Chess.when: App.When<App.Chess.State>
   (event, state)
+  let local = state@local
+  let global = state@global
+  let room = String.take(16, Crypto.Keccak.hash(App.Chess.room))
   case event {
-    init: App.pass!
+    init: App.watch!(room)
+    mouse_down:
+      let selected = local@selected
+      let coord = App.Chess.mouse_to_coord(local@mouse_pos)
+      case selected {
+        none:
+          open coord
+            let local = local@selected <- some(coord)
+            App.set_local!(local)
+        some: 
+          let {x0, y0} = selected.value
+          let {x1, y1} = coord
+          let is_possible = App.Chess.is_move_possible(x0, y0, x1, y1, local@team, global)
+          let f = (x: Nat) Bits.trim(3, Nat.to_bits(x)) 
+          if is_possible then
+            let code = Bits.concat(local@team, Bits.concat(f(x0), Bits.concat(f(y0), Bits.concat(f(x1), f(y1))))) 
+            let code = Bits.show(code)
+            let new_team = Bits.not(local@team)
+            IO {
+              App.new_post!(room, code)
+              let local = local@selected <- none
+              let local = local@team <- new_team
+              App.set_local!(local)
+            }
+            
+          else
+            App.set_local!(local@selected <- none)
+        }
+    mouse_move:
+      let local = local@mouse_pos <- event.mouse_pos
+      App.set_local!(local)
   } default App.pass!
+
 
 // Global ticker 
 App.Chess.tick: App.Tick<App.Chess.State>
   App.no_tick<App.Chess.State>
 
-// Global visitor
 App.Chess.post: App.Post<App.Chess.State>
   (time, room, addr, data, glob)
-  glob
-
-// A "Chess, world!" + counter application
+  let code = Bits.read(data)
+  // App.Chess.move(code, glob)
+  case code {
+    o: App.Chess.move(code.pred, glob)
+  } default glob
+  
 App.Chess: App<App.Chess.State>
   let img = VoxBox.alloc_capacity(65536*8)
   App.new<App.Chess.State>(
@@ -177,3 +442,4 @@ App.Chess: App<App.Chess.State>
     App.Chess.tick
     App.Chess.post
   )
+
