@@ -186,7 +186,7 @@ App.Chess.is_move_possible_pawn(x0: Nat, y0: Nat, x1: Nat, y1: Nat, is_to_tile_e
   if Bits.eql(piece_owner, Bits.o(Bits.e)) then
     if is_to_tile_empty then 
       if Nat.eql(y0, 6) then 
-        Nat.eql(x0, x1) && (Nat.eql((y0 - y1), 1) || Nat.eql((y0 - y1), 2))
+        Nat.eql(x0, x1) && (Nat.eql((y0 - y1), 1) || (Nat.eql((y0 - y1), 2) && Bits.eql(App.Chess.get(x1, y1 + 1, board), Bits.o(Bits.o(Bits.o(Bits.o(Bits.e))))))) 
       else
         Nat.eql(x0, x1) && Nat.eql((y0 - y1), 1)
     else
@@ -194,7 +194,7 @@ App.Chess.is_move_possible_pawn(x0: Nat, y0: Nat, x1: Nat, y1: Nat, is_to_tile_e
   else 
     if is_to_tile_empty then
       if Nat.eql(y0, 1) then
-        Nat.eql(x0, x1) && (Nat.eql((y1 - y0), 1) || Nat.eql((y1 - y0), 2))
+        Nat.eql(x0, x1) && (Nat.eql((y1 - y0), 1) || (Nat.eql((y1 - y0), 2) && Bits.eql(App.Chess.get(x1, y1 - 1, board), Bits.o(Bits.o(Bits.o(Bits.o(Bits.e)))))))
       else
         Nat.eql(x0, x1) && Nat.eql((y1 - y0), 1)
     else
@@ -286,7 +286,7 @@ App.Chess.is_move_possible_bishop_aux2(x0: Int, y0: Int, x1: Int, y1: Int, board
   else
     if Bits.eql(App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board), Bits.o(Bits.o(Bits.o(Bits.o(Bits.e))))) 
       && Bits.eql(App.Chess.get(Int.to_nat(x0), Int.to_nat(y0), board), Bits.o(Bits.o(Bits.o(Bits.o(Bits.e)))))then
-      App.Chess.is_move_possible_bishop_aux1(x0 + 1, y0 - 1, x1 - 1, y1 + 1, board)
+      App.Chess.is_move_possible_bishop_aux2(x0 + 1, y0 - 1, x1 - 1, y1 + 1, board)
     else
       false
 
@@ -296,7 +296,7 @@ App.Chess.is_move_possible_bishop_aux3(x0: Int, y0: Int, x1: Int, y1: Int, board
   else
     if Bits.eql(App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board), Bits.o(Bits.o(Bits.o(Bits.o(Bits.e))))) 
     && Bits.eql(App.Chess.get(Int.to_nat(x0), Int.to_nat(y0), board), Bits.o(Bits.o(Bits.o(Bits.o(Bits.e))))) then
-      App.Chess.is_move_possible_bishop_aux1(x0 - 1, y0 + 1, x1 + 1, y1 - 1, board)
+      App.Chess.is_move_possible_bishop_aux3(x0 - 1, y0 + 1, x1 + 1, y1 - 1, board)
     else
       false
 
@@ -306,7 +306,7 @@ App.Chess.is_move_possible_bishop_aux4(x0: Int, y0: Int, x1: Int, y1: Int, board
   else
     if Bits.eql(App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board), Bits.o(Bits.o(Bits.o(Bits.o(Bits.e))))) 
     && Bits.eql(App.Chess.get(Int.to_nat(x0), Int.to_nat(y0), board), Bits.o(Bits.o(Bits.o(Bits.o(Bits.e)))))then
-      App.Chess.is_move_possible_bishop_aux1(x0 - 1, y0 - 1, x1 + 1, y1 + 1, board)
+      App.Chess.is_move_possible_bishop_aux4(x0 - 1, y0 - 1, x1 + 1, y1 + 1, board)
     else
       false
 
