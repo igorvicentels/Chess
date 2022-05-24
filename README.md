@@ -10,7 +10,7 @@ Implementation of a chess game in Kind
 
 2. This repository should be in base/App 
 
-4. Install js-beatutify using ``npm``:
+4. Install js-beautify using ``npm``:
 
 ``
    npm i -g js-beautify
@@ -46,11 +46,12 @@ In the Board:
 
 and we use a sistem to identify the tiles: 
 
-$$\forall n \in 0 \leqslant n< 64 $$
+![CodeCogsEqn (2)](https://user-images.githubusercontent.com/95002561/170095935-476d85a1-e3ff-4d06-b138-6cc14164f80a.gif)
 
-$$x \equiv n \(\bmod\ n) $$
+![CodeCogsEqn (3)](https://user-images.githubusercontent.com/95002561/170096001-996f5331-2e70-436d-b4b6-69c9b486d66e.gif)
 
-$$y =  \left \lfloor \frac{n}{8} \right \rfloor$$
+![CodeCogsEqn (4)](https://user-images.githubusercontent.com/95002561/170096071-0dfb113d-09b6-403e-beda-692fc467e929.gif)
 
-![chessmod](https://user-images.githubusercontent.com/95002561/170087727-d40adca1-ce83-40a1-ba78-269715787766.png)
+![chessmod](https://user-images.githubusercontent.com/95002561/170095663-834867dc-4762-423d-9664-48c3dc2a62ef.png)
+
 
