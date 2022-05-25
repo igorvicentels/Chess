@@ -13,7 +13,7 @@ App.Chess.Board: Type
   List<Bits>
 
 App.Chess.room: String
-  "Chess_Room_109"
+  "Chess_Room_111"
 
 App.Chess.scale: U32
   2
@@ -380,6 +380,16 @@ App.Chess.move.aux(x0: Nat, y0: Nat, x1: Nat, y1: Nat, team: Bits, board: App.Ch
       else
         board[4] <- from_chunk
 
+  // Pawn Promotion
+  let from_tile =
+    if Bits.eql(from_tile, Bits.i(Bits.i(Bits.o(Bits.o(Bits.e))))) && Nat.eql(y1, 7) then
+      Bits.i(Bits.i(Bits.o(Bits.i(Bits.e))))
+    else
+      if Bits.eql(from_tile, Bits.o(Bits.i(Bits.o(Bits.o(Bits.e))))) && Nat.eql(y1, 0) then
+        Bits.o(Bits.i(Bits.o(Bits.i(Bits.e))))
+      else
+        from_tile
+  
   let to_index = (x1 * tile_size) + (y1 * 8 * tile_size)
   let to_chunk = App.Chess.get_chunk(to_index, new_board)
   let to_chunk = Bits.set(56 - to_index % 60, from_tile, to_chunk)
@@ -395,7 +405,6 @@ App.Chess.move.aux(x0: Nat, y0: Nat, x1: Nat, y1: Nat, team: Bits, board: App.Ch
       else
         new_board[4] <- to_chunk
 
-  
   
 
   let new_board = App.Chess.castle(x1, y1, new_board)
