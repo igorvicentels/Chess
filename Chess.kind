@@ -417,27 +417,16 @@ App.Chess.move.aux(x0: Nat, y0: Nat, x1: Nat, y1: Nat, team: Bits, board: App.Ch
   log(Bool.show(App.Chess.is_castle_possible(4, 7, 2, 7, board)))
   log(Bool.show(App.Chess.is_castle_possible(4, 7, 6, 7, board)))
 
-  
-  let white_king = Bits.o(Bits.o(Bits.i(Bits.i(Bits.e))))
-  let {xw, yw} = App.Chess.find_piece(white_king, new_board) <> Pair.new!!<8,8>
-
-  let black_king = Bits.i(Bits.o(Bits.i(Bits.i(Bits.e))))
-  let {xb, yb} = App.Chess.find_piece(black_king, new_board) <> Pair.new!!<8,8>
-  
-  let is_check =
-    if Bits.eql(Bits.o(Bits.e), team) then 
-      App.Chess.is_checked(xw, yw, new_board)
-    else
-      App.Chess.is_checked(xb, yb, new_board)
 
   
+  let is_check = App.Chess.in_check(team, board)  
   if is_check then
-    // let new_chunk = Bits.set(5, Bits.i(Bits.e), board[4] <> Bits.e)
-    // board[4] <- new_chunk
-    board
-  else
-    let last_chunk = new_board[4]
-    let new_board = 
+    let still_check =  App.Chess.in_check(team, new_board)
+    if still_check then 
+      board
+    else
+      let last_chunk = new_board[4]
+      let new_board = 
       case last_chunk {
         none: new_board
         some: 
@@ -446,8 +435,36 @@ App.Chess.move.aux(x0: Nat, y0: Nat, x1: Nat, y1: Nat, team: Bits, board: App.Ch
           let new_board = new_board[4] <- last_chunk
           new_board
       }
-    new_board
+      new_board
+  else  
+    let will_in_check = App.Chess.in_check(team, new_board)
+    if will_in_check then
+      board
+    else
+      let last_chunk = new_board[4]
+      let new_board = 
+      case last_chunk {
+        none: new_board
+        some: 
+          let last_chunk = Bits.set(0, Bits.not(team), last_chunk.value)
+          //let last_chunk = Bits.set(5, Bits.o(Bits.e), last_chunk)
+          let new_board = new_board[4] <- last_chunk
+          new_board
+      }
+      new_board          
+ 
 
+App.Chess.in_check(team: Bits, board: App.Chess.Board): Bool
+  let white_king = Bits.o(Bits.o(Bits.i(Bits.i(Bits.e))))
+  let {xw, yw} = App.Chess.find_piece(white_king, board) <> Pair.new!!<8,8>
+
+  let black_king = Bits.i(Bits.o(Bits.i(Bits.i(Bits.e))))
+  let {xb, yb} = App.Chess.find_piece(black_king, board) <> Pair.new!!<8,8>
+    
+  if Bits.eql(Bits.o(Bits.e), team) then
+    App.Chess.is_checked(xw, yw, board)
+  else
+    App.Chess.is_checked(xb, yb, board)
 
 App.Chess.castle_move_rook(x0: Nat, y0: Nat, x1: Nat, y1: Nat, board: App.Chess.Board): App.Chess.Board
   let tile_size  = 4 :: Nat
@@ -739,7 +756,7 @@ App.Chess.is_checked_diagonal_aux4(x0: Nat, y0: Nat, x1: Int, y1: Int, board: Ap
         || Bits.eql(Bits.drop(1, App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board)), Bits.i(Bits.o(Bits.i(Bits.e))))
 
 
-App.Chess.is_checked_knight(x0: Nat, y0: Nat, board: App.Chess.Board): Bool //8 aux eu nao sei se faz sentido
+App.Chess.is_checked_knight(x0: Nat, y0: Nat, board: App.Chess.Board): Bool 
   let x1 = Nat.to_int(x0)
   let y1 = Nat.to_int(y0)
   let aux1 = App.Chess.is_checked_knight_aux1(x0, y0, x1 + 1, y1 + 2, board)
@@ -906,18 +923,22 @@ App.Chess.when: App.When<App.Chess.State>
             let code = Bits.concat(local@team, Bits.concat(f(x0), Bits.concat(f(y0), Bits.concat(f(x1), f(y1))))) 
             let code = Bits.show(code)
             let new_team = Bits.not(local@team)
+            let same_team = local@team 
             IO {
               App.new_post!(room, code)
-              log(Bits.show(Bits.slice(1, Bits.drop(5, global[4] <> Bits.e))))
-              let code1 = Bits.concat(local@team, Bits.concat(f(x0), Bits.concat(f(y0), Bits.concat(f(x1), f(y1))))) 
-              let global = App.Chess.move(code1, global)
-              if Bits.eql(Bits.i(Bits.e), Bits.slice(1, Bits.drop(5, global[4] <> Bits.e))) then
-                let local = local@selected <- none
-                App.set_local!(local)
-              else
-                let local = local@selected <- none
-                let local = local@team <- new_team
-                App.set_local!(local)
+              let local = local@selected <- none
+              let code1 = Bits.concat(local@team, Bits.concat(f(x0), Bits.concat(f(y0), Bits.concat(f(x1), f(y1)))))              
+              let board = App.Chess.move(code1, global)
+              log("board: " | List.show!(Bits.show, board))
+              log("Global: " | List.show!(Bits.show, state@global))
+              log("Igual: " | Bool.show(List.eql!(Bits.eql, board, state@global)))
+              let local =
+                if List.eql!(Bits.eql, board, state@global) then
+                  local@team  <- same_team
+                else
+                  local@team <- new_team              
+            App.set_local!(local)
+            
             }
           else  
             App.set_local!(local@selected <- none)
