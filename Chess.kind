@@ -41,7 +41,7 @@ App.Chess.tile_size: U32
 // white bishop -> 1000
 // white queen  -> 1010
 // white king   -> 1100
-
+ 
 // Initial state
 App.Chess.init: App.Init<App.Chess.State>
   let turn = 0 // TODO
