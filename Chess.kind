@@ -13,7 +13,7 @@ App.Chess.Board: Type
   List<Bits>
 
 App.Chess.room: String
-  "Chess_Room_143"
+  "Chess_Room_1437"
 
 App.Chess.scale: U32
   2
@@ -310,14 +310,30 @@ App.Chess.is_move_possible_king(x0: Int, y0: Int, x1: Int, y1: Int, board: App.C
   Nat.lte(Int.abs(x0 - x1), 1) && Nat.lte(Int.abs(y0 - y1), 1)
 
 
-App.Chess.move(code: Bits, board: App.Chess.Board): App.Chess.Board
+App.Chess.move(code: Bits, board: App.Chess.Board): Maybe<App.Chess.Board>
   let team = Bits.slice(1,code)
   let x0   = Bits.slice(3,Bits.drop(1,code))
   let y0   = Bits.slice(3,Bits.drop(4,code))
   let x1   = Bits.slice(3,Bits.drop(7,code))
   let y1   = Bits.slice(3,Bits.drop(10,code))
   let is_possible = App.Chess.is_move_possible(Bits.to_nat(x0), Bits.to_nat(y0), Bits.to_nat(x1), Bits.to_nat(y1), team, board)
-  if is_possible then App.Chess.move.aux(Bits.to_nat(x0), Bits.to_nat(y0), Bits.to_nat(x1), Bits.to_nat(y1), team, board) else board
+  if is_possible then 
+    let is_check = App.Chess.in_check(team, board)
+    let new_board = App.Chess.move.aux(Bits.to_nat(x0), Bits.to_nat(y0), Bits.to_nat(x1), Bits.to_nat(y1), team, board)  
+    if is_check then
+      let still_check =  App.Chess.in_check(team, new_board)
+      if still_check then 
+        none
+      else 
+        some(new_board)
+    else
+      let will_in_check = App.Chess.in_check(team, new_board)
+      if will_in_check then
+        none 
+      else            
+        some(new_board) 
+  else 
+    none
 
 App.Chess.move.aux(x0: Nat, y0: Nat, x1: Nat, y1: Nat, team: Bits, board: App.Chess.Board): App.Chess.Board
   let tile_size  = 4 :: Nat
@@ -375,46 +391,18 @@ App.Chess.move.aux(x0: Nat, y0: Nat, x1: Nat, y1: Nat, team: Bits, board: App.Ch
     else
       new_board
 
+  let last_chunk = new_board[4] <> Bits.e
+  let last_chunk = Bits.set(8, set_en_passant, last_chunk) 
+  let new_board = new_board[4] <- last_chunk
+   
+
   let new_board = App.Chess.castle(x1, y1, new_board)
 
   let new_board = App.Chess.set_castle_bits(x0, y0, new_board)
-     
-  let is_check = App.Chess.in_check(team, board)  
-  if is_check then
-    let still_check =  App.Chess.in_check(team, new_board)
-    if still_check then 
-      log(List.show!(Bits.show, new_board)) 
-      board
-    else
-      let last_chunk = new_board[4]
-      let new_board = 
-      case last_chunk {
-        none: new_board
-        some: 
-          let last_chunk = Bits.set(0, Bits.not(team), last_chunk.value)
-          let last_chunk = Bits.set(8, set_en_passant, last_chunk) // en passant
-          //let last_chunk = Bits.set(5, Bits.o(Bits.e), last_chunk)
-          let new_board = new_board[4] <- last_chunk
-          new_board
-      }
-      new_board
-  else  
-    let will_in_check = App.Chess.in_check(team, new_board)
-    if will_in_check then
-      board
-    else
-      let last_chunk = new_board[4]
-      let new_board = 
-      case last_chunk {
-        none: new_board
-        some: 
-          let last_chunk = Bits.set(0, Bits.not(team), last_chunk.value)
-          let last_chunk = Bits.set(8, set_en_passant, last_chunk) // en passant
-          //let last_chunk = Bits.set(5, Bits.o(Bits.e), last_chunk)
-          let new_board = new_board[4] <- last_chunk
-          new_board
-      }
-      new_board          
+
+
+
+  new_board         
  
   // log(List.show!(Bits.show, new_board)) 
   // log(Bool.show(App.Chess.is_castle_possible(4, 0, 2, 0, board)))
@@ -930,32 +918,23 @@ App.Chess.when: App.When<App.Chess.State>
         some: 
           let {x0, y0} = selected.value
           let {x1, y1} = coord
-          let is_possible = App.Chess.is_move_possible(x0, y0, x1, y1, local@team, global)
-          let f = (x: Nat) Bits.trim(3, Nat.to_bits(x)) 
-          if is_possible then
-            let code = Bits.concat(local@team, Bits.concat(f(x0), Bits.concat(f(y0), Bits.concat(f(x1), f(y1))))) 
-            let code = Bits.show(code)
-            let new_team = Bits.not(local@team)
-            let same_team = local@team 
-            IO {
-              App.new_post!(room, code)
-              let local = local@selected <- none
-              let code1 = Bits.concat(local@team, Bits.concat(f(x0), Bits.concat(f(y0), Bits.concat(f(x1), f(y1)))))              
-              let board = App.Chess.move(code1, global)
-              // log("board: " | List.show!(Bits.show, board))
-              // log("Global: " | List.show!(Bits.show, state@global))
-              // log("Igual: " | Bool.show(List.eql!(Bits.eql, board, state@global)))
-              let local =
-                if List.eql!(Bits.eql, board, state@global) then
-                  local@team  <- same_team
-                else
-                  local@team <- new_team              
-            App.set_local!(local)
-            
+          //let is_possible = App.Chess.is_move_possible(x0, y0, x1, y1, local@team, global)
+          let f = (x: Nat) Bits.trim(3, Nat.to_bits(x))
+          let code = Bits.concat(local@team, Bits.concat(f(x0), Bits.concat(f(y0), Bits.concat(f(x1), f(y1))))) 
+          let new_board = App.Chess.move(code, global)
+          case new_board{
+            none: App.set_local!(local@selected <- none)
+            some: 
+              let code = Bits.show(code)
+              let new_team = Bits.not(local@team)                
+              IO {
+                App.new_post!(room, code)
+                let local = local@selected <- none             
+                let local = local@team <- new_team                                
+                App.set_local!(local)          
             }
-          else  
-            App.set_local!(local@selected <- none)
-        }
+          } 
+      } 
     mouse_move:
       let local = local@mouse_pos <- event.mouse_pos
       App.set_local!(local)
@@ -972,7 +951,11 @@ App.Chess.post: App.Post<App.Chess.State>
   // App.Chess.move(code, glob)
   case code {
     o: 
-      App.Chess.move(code.pred, glob)
+      let new_board = App.Chess.move(code.pred, glob)
+      case new_board{
+        none: glob
+        some: new_board.value
+      }
   } default glob
   
 App.Chess: App<App.Chess.State>
