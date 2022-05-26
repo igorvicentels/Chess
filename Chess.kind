@@ -13,7 +13,7 @@ App.Chess.Board: Type
   List<Bits>
 
 App.Chess.room: String
-  "Chess_Room_135"
+  "Chess_Room_143"
 
 App.Chess.scale: U32
   2
@@ -147,24 +147,30 @@ App.Chess.is_move_possible(x0: Nat, y0: Nat, x1: Nat, y1: Nat, team: Bits, board
     let is_user_turn      = Bits.eql(piece_owner, player)
     let is_to_tile_empty  = Bits.eql(to_tile, Bits.o(Bits.o(Bits.o(Bits.o(Bits.e)))))
     let is_to_tile_player = Bits.eql(Bits.slice(1, to_tile), team) 
+    let pawn   = Bits.i(Bits.o(Bits.o(Bits.e)))
+    let rook   = Bits.o(Bits.i(Bits.o(Bits.e)))
+    let knight = Bits.i(Bits.i(Bits.o(Bits.e)))
+    let bishop = Bits.o(Bits.o(Bits.i(Bits.e)))
+    let queen  = Bits.i(Bits.o(Bits.i(Bits.e)))
+    let king   = Bits.o(Bits.i(Bits.i(Bits.e)))
+
     if is_piece_owner && (is_to_tile_empty || Bool.not(is_to_tile_player)) then
-      switch Bits.eql(origin_tile) {
-        Bits.o(Bits.i(Bits.o(Bits.o(Bits.e)))): App.Chess.is_move_possible_pawn(x0, y0, x1, y1, is_to_tile_empty, piece_owner, board)
-                                                || App.Chess.is_move_possible_en_passant(x0, y0, x1, y1, is_to_tile_empty, piece_owner, board)
-        Bits.o(Bits.o(Bits.i(Bits.o(Bits.e)))): App.Chess.is_move_possible_rook(x0, y0, x1, y1, board)
-        Bits.o(Bits.i(Bits.i(Bits.o(Bits.e)))): App.Chess.is_move_possible_knight(Nat.to_int(x0), Nat.to_int(y0), Nat.to_int(x1), Nat.to_int(y1), board)
-        Bits.o(Bits.o(Bits.o(Bits.i(Bits.e)))): App.Chess.is_move_possible_bishop(Nat.to_int(x0), Nat.to_int(y0), Nat.to_int(x1), Nat.to_int(y1), board)
-        Bits.o(Bits.i(Bits.o(Bits.i(Bits.e)))): App.Chess.is_move_possible_queen(x0, y0, x1, y1, board)
-        Bits.o(Bits.o(Bits.i(Bits.i(Bits.e)))): App.Chess.is_move_possible_king(Nat.to_int(x0), Nat.to_int(y0), Nat.to_int(x1), Nat.to_int(y1), board)
-                                                || App.Chess.is_castle_possible(x0, y0, x1, y1, board)
-        Bits.i(Bits.i(Bits.o(Bits.o(Bits.e)))): App.Chess.is_move_possible_pawn(x0, y0, x1, y1, is_to_tile_empty, piece_owner, board)
-                                                || App.Chess.is_move_possible_en_passant(x0, y0, x1, y1, is_to_tile_empty, piece_owner, board)
-        Bits.i(Bits.o(Bits.i(Bits.o(Bits.e)))): App.Chess.is_move_possible_rook(x0, y0, x1, y1, board)
-        Bits.i(Bits.i(Bits.i(Bits.o(Bits.e)))): App.Chess.is_move_possible_knight(Nat.to_int(x0), Nat.to_int(y0), Nat.to_int(x1), Nat.to_int(y1), board)
-        Bits.i(Bits.o(Bits.o(Bits.i(Bits.e)))): App.Chess.is_move_possible_bishop(Nat.to_int(x0), Nat.to_int(y0), Nat.to_int(x1), Nat.to_int(y1), board)
-        Bits.i(Bits.i(Bits.o(Bits.i(Bits.e)))): App.Chess.is_move_possible_queen(x0, y0, x1, y1, board)
-        Bits.i(Bits.o(Bits.i(Bits.i(Bits.e)))): App.Chess.is_move_possible_king(Nat.to_int(x0), Nat.to_int(y0), Nat.to_int(x1), Nat.to_int(y1), board)
-                                                || App.Chess.is_castle_possible(x0, y0, x1, y1, board)
+      switch Bits.eql(Bits.drop(1, origin_tile)) {
+        pawn:   
+          App.Chess.is_move_possible_pawn(x0, y0, x1, y1, is_to_tile_empty, piece_owner, board) ||
+          App.Chess.is_move_possible_en_passant(x0, y0, x1, y1, is_to_tile_empty, piece_owner, board)
+        rook:   
+          App.Chess.is_move_possible_line(x0, y0, x1, y1, origin_tile, board)
+        knight: 
+          App.Chess.is_move_possible_knight(Nat.to_int(x0), Nat.to_int(y0), Nat.to_int(x1), Nat.to_int(y1), board)
+        bishop: 
+          App.Chess.is_move_possible_line(x0, y0, x1, y1, origin_tile, board)
+        queen:  
+          App.Chess.is_move_possible_line(x0, y0, x1, y1, origin_tile, board)
+        king:   
+          App.Chess.is_move_possible_king(Nat.to_int(x0), Nat.to_int(y0), Nat.to_int(x1), Nat.to_int(y1), board) ||
+          App.Chess.is_castle_possible(x0, y0, x1, y1, board)
+        
       } default false
     else
       false
@@ -250,56 +256,48 @@ App.Chess.is_move_possible_pawn(x0: Nat, y0: Nat, x1: Nat, y1: Nat, is_to_tile_e
     else
       (Nat.eql(x1 - x0, 1) || Nat.eql(x0 - x1, 1)) && Nat.eql((y1 - y0), 1)
     
-App.Chess.is_move_possible_rook(x0: Nat, y0: Nat, x1: Nat, y1: Nat, board: App.Chess.Board): Bool
-  if Bool.not(Nat.eql(x0, x1) || Nat.eql(y0, y1)) then
-    false
-  else
-    if Nat.ltn(x0, x1) then
-      App.Chess.is_move_possible_rook_aux1(x0 + 1, y0, x1 - 1, y1, board)
-    else if Nat.ltn(x1, x0) then
-      App.Chess.is_move_possible_rook_aux2(x0 - 1, y0, x1 + 1, y1, board)
-    else if Nat.ltn(y0, y1) then
-      App.Chess.is_move_possible_rook_aux3(x0, y0 + 1, x1, y1 - 1, board)
-    else
-      App.Chess.is_move_possible_rook_aux4(x0, y0 - 1, x1, y1 + 1, board)
 
-App.Chess.is_move_possible_rook_aux1(x0: Nat, y0: Nat, x1: Nat, y1: Nat, board: App.Chess.Board): Bool
-  if Nat.gtn(x0, x1) then
-    true
-  else 
-    if Bits.eql(App.Chess.get(x1, y1, board), Bits.o(Bits.o(Bits.o(Bits.o(Bits.e)))))
-    && Bits.eql(App.Chess.get(x0, y0, board), Bits.o(Bits.o(Bits.o(Bits.o(Bits.e))))) then
-      App.Chess.is_move_possible_rook_aux1(x0 + 1, y0, x1 - 1, y1, board)
-    else
-      false
+App.Chess.is_move_possible_line(x0: Nat, y0: Nat, x1: Nat, y1: Nat, origin_tile: Bits, board: App.Chess.Board): Bool
+  let rook   = Bits.o(Bits.i(Bits.o(Bits.e)))
+  let bishop = Bits.o(Bits.o(Bits.i(Bits.e)))
+  let queen  = Bits.i(Bits.o(Bits.i(Bits.e)))
+  let get_f  = (a: Nat, b: Nat) App.Chess.get_f(a, b)
 
-App.Chess.is_move_possible_rook_aux2(x0: Nat, y0: Nat, x1: Nat, y1: Nat, board: App.Chess.Board): Bool
-  if Nat.ltn(x0, x1) then
-    true
-  else 
-    if Bits.eql(App.Chess.get(x1, y1, board), Bits.o(Bits.o(Bits.o(Bits.o(Bits.e)))))
-    && Bits.eql(App.Chess.get(x0, y0, board), Bits.o(Bits.o(Bits.o(Bits.o(Bits.e))))) then
-      App.Chess.is_move_possible_rook_aux2(x0 - 1, y0, x1 + 1, y1, board)
-    else
-      false
+  switch Bits.eql(Bits.drop(1, origin_tile)) {
+    rook: 
+      (Nat.eql(x0, x1) || Nat.eql(y0, y1)) &&
+      App.Chess.Board.line_recursive(x0, y0, x1, y1, get_f(x0, x1), get_f(y0, y1), board)
+    bishop:
+      Nat.eql(Int.abs(Nat.to_int(x0) - Nat.to_int(x1)), Int.abs(Nat.to_int(y0) - Nat.to_int(y1))) &&
+      App.Chess.Board.line_recursive(x0, y0, x1, y1, get_f(x0, x1), get_f(y0, y1), board)
+    queen:
+      App.Chess.Board.line_recursive(x0, y0, x1, y1, get_f(x0, x1), get_f(y0, y1), board)
+  } default false
 
-App.Chess.is_move_possible_rook_aux3(x0: Nat, y0: Nat, x1: Nat, y1: Nat, board: App.Chess.Board): Bool
-  if Nat.gtn(y0, y1) then
+App.Chess.get_f(a: Nat, b: Nat): Nat -> Nat
+  (nat)
+  case Nat.cmp(a,b) {
+    ltn: Nat.add(nat, 1)
+    eql: nat
+    gtn: Nat.sub(nat, 1)
+  }
+
+App.Chess.Board.line_recursive(
+x0: Nat, y0: Nat           // From
+x1: Nat, y1: Nat           // To
+x_f: Nat -> Nat            // X Variation
+y_f: Nat -> Nat            // Y Variation
+board: App.Chess.Board     // Board
+): Bool 
+  let x = x_f(x0)
+  let y = y_f(y0)
+  let tile = App.Chess.get(x, y, board)
+  let empty_tile = Bits.o(Bits.o(Bits.o(Bits.o(Bits.e))))
+  if (x =? x1) && (y =? y1) then
     true
-  else 
-    if Bits.eql(App.Chess.get(x1, y1, board), Bits.o(Bits.o(Bits.o(Bits.o(Bits.e)))))
-    && Bits.eql(App.Chess.get(x0, y0, board), Bits.o(Bits.o(Bits.o(Bits.o(Bits.e))))) then
-      App.Chess.is_move_possible_rook_aux3(x0, y0 + 1, x1, y1 - 1, board)
-    else
-      false
-  
-App.Chess.is_move_possible_rook_aux4(x0: Nat, y0: Nat, x1: Nat, y1: Nat, board: App.Chess.Board): Bool
-  if Nat.ltn(y0, y1) then
-    true
-  else 
-    if Bits.eql(App.Chess.get(x1, y1, board), Bits.o(Bits.o(Bits.o(Bits.o(Bits.e)))))
-    && Bits.eql(App.Chess.get(x0, y0, board), Bits.o(Bits.o(Bits.o(Bits.o(Bits.e))))) then
-      App.Chess.is_move_possible_rook_aux4(x0, y0 - 1, x1, y1 + 1, board)
+  else  
+    if Bits.eql(tile, empty_tile) then
+      App.Chess.Board.line_recursive(x, y, x1, y1, x_f, y_f, board)
     else
       false
 
@@ -307,62 +305,6 @@ App.Chess.is_move_possible_rook_aux4(x0: Nat, y0: Nat, x1: Nat, y1: Nat, board: 
 App.Chess.is_move_possible_knight(x0: Int, y0: Int, x1: Int, y1: Int, board: App.Chess.Board): Bool
   (Nat.eql(Int.abs(x0 - x1), 2) && Nat.eql(Int.abs(y0 - y1), 1)) || (Nat.eql(Int.abs(x0 - x1), 1) && Nat.eql(Int.abs(y0 - y1), 2))
 
-App.Chess.is_move_possible_bishop(x0: Int, y0: Int, x1: Int, y1: Int, board: App.Chess.Board): Bool
-  if Bool.not(Nat.eql(Int.abs(x0 - x1), Int.abs(y0 - y1))) then
-    false
-  else
-    if Int.ltn(x0, x1) && Int.ltn(y0, y1) then
-      App.Chess.is_move_possible_bishop_aux1(x0 + 1, y0 + 1, x1 - 1, y1 - 1, board)   
-    else if Int.ltn(x0, x1) && Int.ltn(y1, y0) then
-      App.Chess.is_move_possible_bishop_aux2(x0 + 1, y0 - 1, x1 - 1, y1 + 1, board)
-    else if Int.ltn(x1, x0) && Int.ltn(y0, y1) then
-      App.Chess.is_move_possible_bishop_aux3(x0 - 1, y0 + 1, x1 + 1, y1 - 1, board)
-    else
-      App.Chess.is_move_possible_bishop_aux4(x0 - 1, y0 - 1, x1 + 1, y1 + 1, board)
-
-App.Chess.is_move_possible_bishop_aux1(x0: Int, y0: Int, x1: Int, y1: Int, board: App.Chess.Board): Bool
-  if Int.gtn(x0, x1) then
-    true
-  else
-    if Bits.eql(App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board), Bits.o(Bits.o(Bits.o(Bits.o(Bits.e)))))
-      && Bits.eql(App.Chess.get(Int.to_nat(x0), Int.to_nat(y0), board), Bits.o(Bits.o(Bits.o(Bits.o(Bits.e))))) then
-      App.Chess.is_move_possible_bishop_aux1(x0 + 1, y0 + 1, x1 - 1, y1 - 1, board)
-    else
-      false
-
-App.Chess.is_move_possible_bishop_aux2(x0: Int, y0: Int, x1: Int, y1: Int, board: App.Chess.Board): Bool
-  if Int.gtn(x0, x1) then
-    true
-  else
-    if Bits.eql(App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board), Bits.o(Bits.o(Bits.o(Bits.o(Bits.e))))) 
-      && Bits.eql(App.Chess.get(Int.to_nat(x0), Int.to_nat(y0), board), Bits.o(Bits.o(Bits.o(Bits.o(Bits.e))))) then
-      App.Chess.is_move_possible_bishop_aux2(x0 + 1, y0 - 1, x1 - 1, y1 + 1, board)
-    else
-      false
-
-App.Chess.is_move_possible_bishop_aux3(x0: Int, y0: Int, x1: Int, y1: Int, board: App.Chess.Board): Bool
-  if Int.gtn(x1, x0) then
-    true
-  else
-    if Bits.eql(App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board), Bits.o(Bits.o(Bits.o(Bits.o(Bits.e))))) 
-      && Bits.eql(App.Chess.get(Int.to_nat(x0), Int.to_nat(y0), board), Bits.o(Bits.o(Bits.o(Bits.o(Bits.e))))) then
-      App.Chess.is_move_possible_bishop_aux3(x0 - 1, y0 + 1, x1 + 1, y1 - 1, board)
-    else
-      false
-
-App.Chess.is_move_possible_bishop_aux4(x0: Int, y0: Int, x1: Int, y1: Int, board: App.Chess.Board): Bool
-  if Int.gtn(x1, x0) then
-    true
-  else
-    if Bits.eql(App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board), Bits.o(Bits.o(Bits.o(Bits.o(Bits.e))))) 
-      && Bits.eql(App.Chess.get(Int.to_nat(x0), Int.to_nat(y0), board), Bits.o(Bits.o(Bits.o(Bits.o(Bits.e))))) then
-      App.Chess.is_move_possible_bishop_aux4(x0 - 1, y0 - 1, x1 + 1, y1 + 1, board)
-    else
-      false
-
-App.Chess.is_move_possible_queen(x0: Nat, y0: Nat, x1: Nat, y1: Nat, board: App.Chess.Board): Bool
-  App.Chess.is_move_possible_rook(x0, y0, x1, y1, board) 
-  || App.Chess.is_move_possible_bishop(Nat.to_int(x0), Nat.to_int(y0), Nat.to_int(x1), Nat.to_int(y1), board)
 
 App.Chess.is_move_possible_king(x0: Int, y0: Int, x1: Int, y1: Int, board: App.Chess.Board): Bool
   Nat.lte(Int.abs(x0 - x1), 1) && Nat.lte(Int.abs(y0 - y1), 1)
@@ -406,20 +348,9 @@ App.Chess.move.aux(x0: Nat, y0: Nat, x1: Nat, y1: Nat, team: Bits, board: App.Ch
       else
         from_tile
 
-  let is_en_passant_possible = 
-    let to_index = (x1 * tile_size) + (y1 * 8 * tile_size)
-    let to_chunk = App.Chess.get_chunk(to_index, new_board)
-    let to_tile = Bits.slice(4, Bits.drop(56 - to_index % 60, to_chunk))
-    log(List.show!(Bool.show, [
-    Bits.eql(Bits.drop(1, from_tile), (Bits.i(Bits.o(Bits.o(Bits.e)))))
-    (Nat.eql(x0 - x1, 1) || Nat.eql(x1 - x0, 1))
-    Bits.eql(to_tile, Bits.o(Bits.o(Bits.o(Bits.o(Bits.e)))))
-  ]))
-    Bits.eql(Bits.drop(1, from_tile), (Bits.i(Bits.o(Bits.o(Bits.e)))))
-    && (Nat.eql(x0 - x1, 1) || Nat.eql(x1 - x0, 1))
-    && Bits.eql(to_tile, Bits.o(Bits.o(Bits.o(Bits.o(Bits.e)))))
-  
-  
+  let is_en_passant_possible = App.Chess.is_en_passant_possible(x0, x1, y1, from_chunk, from_tile, new_board)
+
+
   let to_index = (x1 * tile_size) + (y1 * 8 * tile_size)
   let to_chunk = App.Chess.get_chunk(to_index, new_board)
   let to_chunk = Bits.set(56 - to_index % 60, from_tile, to_chunk)
@@ -436,14 +367,7 @@ App.Chess.move.aux(x0: Nat, y0: Nat, x1: Nat, y1: Nat, team: Bits, board: App.Ch
         new_board[4] <- to_chunk
 
 
-  let en_passant =
-    if (Bits.eql(from_tile, Bits.i(Bits.i(Bits.o(Bits.o(Bits.e))))) && Nat.eql(y0, 1) && Nat.eql(y1, 3))
-    || (Bits.eql(from_tile, Bits.o(Bits.i(Bits.o(Bits.o(Bits.e))))) && Nat.eql(y0, 6) && Nat.eql(y1, 4)) then
-      log(Bits.show(Bits.trim(4, Nat.to_bits(x0 + 1))))
-      log(Nat.show(Bits.to_nat(Bits.trim(4, Nat.to_bits(x0 + 1)))))
-      Bits.trim(4, (Nat.to_bits(x0 + 1)))
-    else    
-      Bits.o(Bits.o(Bits.o(Bits.o(Bits.e))))
+  let set_en_passant = App.Chess.set_en_passant(x0, y0, y1, from_tile)
 
   let new_board =
     if is_en_passant_possible then
@@ -451,25 +375,10 @@ App.Chess.move.aux(x0: Nat, y0: Nat, x1: Nat, y1: Nat, team: Bits, board: App.Ch
     else
       new_board
 
-  // let last_chunk = board[4]
-  // let new_board = 
-  //     case last_chunk {
-  //       none: new_board
-  //       some: 
-  //         let last_chunk = Bits.set(8, en_passant, last_chunk.value)
-  //         //let last_chunk = Bits.set(5, Bits.o(Bits.e), last_chunk)
-  //         let new_board = new_board[4] <- last_chunk
-  //         new_board
-  //     }
-
   let new_board = App.Chess.castle(x1, y1, new_board)
 
   let new_board = App.Chess.set_castle_bits(x0, y0, new_board)
      
-
-
-
-  
   let is_check = App.Chess.in_check(team, board)  
   if is_check then
     let still_check =  App.Chess.in_check(team, new_board)
@@ -483,7 +392,7 @@ App.Chess.move.aux(x0: Nat, y0: Nat, x1: Nat, y1: Nat, team: Bits, board: App.Ch
         none: new_board
         some: 
           let last_chunk = Bits.set(0, Bits.not(team), last_chunk.value)
-          let last_chunk = Bits.set(8, en_passant, last_chunk) // en passant
+          let last_chunk = Bits.set(8, set_en_passant, last_chunk) // en passant
           //let last_chunk = Bits.set(5, Bits.o(Bits.e), last_chunk)
           let new_board = new_board[4] <- last_chunk
           new_board
@@ -500,7 +409,7 @@ App.Chess.move.aux(x0: Nat, y0: Nat, x1: Nat, y1: Nat, team: Bits, board: App.Ch
         none: new_board
         some: 
           let last_chunk = Bits.set(0, Bits.not(team), last_chunk.value)
-          let last_chunk = Bits.set(8, en_passant, last_chunk) // en passant
+          let last_chunk = Bits.set(8, set_en_passant, last_chunk) // en passant
           //let last_chunk = Bits.set(5, Bits.o(Bits.e), last_chunk)
           let new_board = new_board[4] <- last_chunk
           new_board
@@ -512,6 +421,28 @@ App.Chess.move.aux(x0: Nat, y0: Nat, x1: Nat, y1: Nat, team: Bits, board: App.Ch
   // log(Bool.show(App.Chess.is_castle_possible(4, 0, 6, 0, board)))
   // log(Bool.show(App.Chess.is_castle_possible(4, 7, 2, 7, board)))
   // log(Bool.show(App.Chess.is_castle_possible(4, 7, 6, 7, board)))
+
+App.Chess.set_en_passant(x0: Nat, y0: Nat, y1: Nat, from_tile: Bits): Bits
+    if (Bits.eql(from_tile, Bits.i(Bits.i(Bits.o(Bits.o(Bits.e))))) && Nat.eql(y0, 1) && Nat.eql(y1, 3))
+    || (Bits.eql(from_tile, Bits.o(Bits.i(Bits.o(Bits.o(Bits.e))))) && Nat.eql(y0, 6) && Nat.eql(y1, 4)) then
+      log(Bits.show(Bits.trim(4, Nat.to_bits(x0 + 1))))
+      log(Nat.show(Bits.to_nat(Bits.trim(4, Nat.to_bits(x0 + 1)))))
+      Bits.trim(4, (Nat.to_bits(x0 + 1)))
+    else    
+      Bits.o(Bits.o(Bits.o(Bits.o(Bits.e))))
+
+App.Chess.is_en_passant_possible(x0: Nat, x1: Nat, y1: Nat, from_chunk: Bits, from_tile: Bits, new_board: App.Chess.Board): Bool                 
+    let to_index = (x1 * 4) + (y1 * 8 * 4)
+    let to_chunk = App.Chess.get_chunk(to_index, new_board)
+    let to_tile = Bits.slice(4, Bits.drop(56 - to_index % 60, to_chunk))
+    log(List.show!(Bool.show, [
+    Bits.eql(Bits.drop(1, from_tile), (Bits.i(Bits.o(Bits.o(Bits.e)))))
+    (Nat.eql(x0 - x1, 1) || Nat.eql(x1 - x0, 1))
+    Bits.eql(to_tile, Bits.o(Bits.o(Bits.o(Bits.o(Bits.e)))))
+  ]))
+    Bits.eql(Bits.drop(1, from_tile), (Bits.i(Bits.o(Bits.o(Bits.e)))))
+    && (Nat.eql(x0 - x1, 1) || Nat.eql(x1 - x0, 1))
+    && Bits.eql(to_tile, Bits.o(Bits.o(Bits.o(Bits.o(Bits.e)))))
 
 App.Chess.move.aux_en_passant(x0: Nat, y0: Nat, x1: Nat, y1: Nat, board: App.Chess.Board): App.Chess.Board
   let index = (x1 * 4) + (y0 * 8 * 4)
