@@ -5,7 +5,7 @@ type App.Chess.State.Local {
   new(
     mouse_pos: Pair<U32, U32>
     selected:  Maybe<Pair<Nat, Nat>>
-    team:      Bits
+    team:      Maybe<Bits>
   )
 }
 
@@ -13,7 +13,7 @@ App.Chess.Board: Type
   List<Bits>
 
 App.Chess.room: String
-  "Chess_Room_1437"
+  "Chess_Room_14477"
 
 App.Chess.scale: U32
   2
@@ -47,7 +47,7 @@ App.Chess.init: App.Init<App.Chess.State>
   let turn = 0 // TODO
   let mouse_pos = {0#32 0#32}
   let selected  = none
-  let team      = Bits.o(Bits.e)
+  let team      = none
   let chunk0    = Bits.trim(60, Nat.to_bits(394554900005204787))
   let chunk1    = Bits.trim(60, Nat.to_bits(216172782113783808))
   let chunk2    = Bits.trim(60, Nat.to_bits(0))
@@ -132,7 +132,9 @@ App.Chess.draw(img: VoxBox): App.Draw<App.Chess.State>
   </div>
 
 App.Chess.next_player(board: App.Chess.Board): Bits
-    Bits.slice(1, board[4] <> Bits.e)
+    let last_bit = Bits.slice(1, board[4] <> Bits.e)
+    log(Bits.show(last_bit))
+    last_bit
 
 App.Chess.is_move_possible(x0: Nat, y0: Nat, x1: Nat, y1: Nat, team: Bits, board: App.Chess.Board): Bool
   let origin_tile          = App.Chess.get(x0, y0, board)
@@ -154,7 +156,7 @@ App.Chess.is_move_possible(x0: Nat, y0: Nat, x1: Nat, y1: Nat, team: Bits, board
     let queen  = Bits.i(Bits.o(Bits.i(Bits.e)))
     let king   = Bits.o(Bits.i(Bits.i(Bits.e)))
 
-    if is_piece_owner && (is_to_tile_empty || Bool.not(is_to_tile_player)) then
+    if (is_user_turn && is_piece_owner) && (is_to_tile_empty || Bool.not(is_to_tile_player)) then
       switch Bits.eql(Bits.drop(1, origin_tile)) {
         pawn:   
           App.Chess.is_move_possible_pawn(x0, y0, x1, y1, is_to_tile_empty, piece_owner, board) ||
@@ -261,18 +263,22 @@ App.Chess.is_move_possible_line(x0: Nat, y0: Nat, x1: Nat, y1: Nat, origin_tile:
   let rook   = Bits.o(Bits.i(Bits.o(Bits.e)))
   let bishop = Bits.o(Bits.o(Bits.i(Bits.e)))
   let queen  = Bits.i(Bits.o(Bits.i(Bits.e)))
-  let get_f  = (a: Nat, b: Nat) App.Chess.get_f(a, b)
-
-  switch Bits.eql(Bits.drop(1, origin_tile)) {
-    rook: 
-      (Nat.eql(x0, x1) || Nat.eql(y0, y1)) &&
-      App.Chess.Board.line_recursive(x0, y0, x1, y1, get_f(x0, x1), get_f(y0, y1), board)
-    bishop:
-      Nat.eql(Int.abs(Nat.to_int(x0) - Nat.to_int(x1)), Int.abs(Nat.to_int(y0) - Nat.to_int(y1))) &&
-      App.Chess.Board.line_recursive(x0, y0, x1, y1, get_f(x0, x1), get_f(y0, y1), board)
-    queen:
-      App.Chess.Board.line_recursive(x0, y0, x1, y1, get_f(x0, x1), get_f(y0, y1), board)
-  } default false
+  let get_f  = (a: Nat, b: Nat) App.Chess.get_f(a, b) 
+  
+  let test  = 
+    switch Bits.eql(Bits.drop(1, origin_tile)) {
+      rook: 
+        (Nat.eql(x0, x1) || Nat.eql(y0, y1)) 
+      bishop:
+        Nat.eql(Int.abs(Nat.to_int(x0) - Nat.to_int(x1)), Int.abs(Nat.to_int(y0) - Nat.to_int(y1))) 
+      queen:
+        true
+    } default false 
+  
+  if test then
+    App.Chess.Board.line_recursive(x0, y0, x1, y1, get_f(x0, x1), get_f(y0, y1), board)
+  else 
+    false
 
 App.Chess.get_f(a: Nat, b: Nat): Nat -> Nat
   (nat)
@@ -317,23 +323,16 @@ App.Chess.move(code: Bits, board: App.Chess.Board): Maybe<App.Chess.Board>
   let x1   = Bits.slice(3,Bits.drop(7,code))
   let y1   = Bits.slice(3,Bits.drop(10,code))
   let is_possible = App.Chess.is_move_possible(Bits.to_nat(x0), Bits.to_nat(y0), Bits.to_nat(x1), Bits.to_nat(y1), team, board)
-  if is_possible then 
-    let is_check = App.Chess.in_check(team, board)
-    let new_board = App.Chess.move.aux(Bits.to_nat(x0), Bits.to_nat(y0), Bits.to_nat(x1), Bits.to_nat(y1), team, board)  
-    if is_check then
-      let still_check =  App.Chess.in_check(team, new_board)
-      if still_check then 
-        none
-      else 
-        some(new_board)
-    else
-      let will_in_check = App.Chess.in_check(team, new_board)
-      if will_in_check then
-        none 
-      else            
-        some(new_board) 
-  else 
+  if is_possible then     
+    let new_board = App.Chess.move.aux(Bits.to_nat(x0), Bits.to_nat(y0), Bits.to_nat(x1), Bits.to_nat(y1), team, board)      
+    let still_check =  App.Chess.in_check(team, new_board)
+    if still_check then 
+      none
+    else 
+      some(new_board)
+  else
     none
+  
 
 App.Chess.move.aux(x0: Nat, y0: Nat, x1: Nat, y1: Nat, team: Bits, board: App.Chess.Board): App.Chess.Board
   let tile_size  = 4 :: Nat
@@ -400,8 +399,10 @@ App.Chess.move.aux(x0: Nat, y0: Nat, x1: Nat, y1: Nat, team: Bits, board: App.Ch
 
   let new_board = App.Chess.set_castle_bits(x0, y0, new_board)
 
-
-
+  let next_player = Bits.not(App.Chess.next_player(new_board))
+  let last_chunk  = Bits.set(0, next_player, new_board[4] <> Bits.e)  
+  let new_board   = new_board[4] <- last_chunk 
+  
   new_board         
  
   // log(List.show!(Bits.show, new_board)) 
@@ -906,7 +907,9 @@ App.Chess.when: App.When<App.Chess.State>
   let global = state@global
   let room = String.take(16, Crypto.Keccak.hash(App.Chess.room))
   case event {
-    init: App.watch!(room)
+    init: App.watch!(room)     
+    
+
     mouse_down:
       let selected = local@selected
       let coord = App.Chess.mouse_to_coord(local@mouse_pos)
@@ -918,19 +921,20 @@ App.Chess.when: App.When<App.Chess.State>
         some: 
           let {x0, y0} = selected.value
           let {x1, y1} = coord
-          //let is_possible = App.Chess.is_move_possible(x0, y0, x1, y1, local@team, global)
+          let team = local@team
+          let team = without team: App.Chess.next_player(global) team
           let f = (x: Nat) Bits.trim(3, Nat.to_bits(x))
-          let code = Bits.concat(local@team, Bits.concat(f(x0), Bits.concat(f(y0), Bits.concat(f(x1), f(y1))))) 
+          let code = Bits.concat(team, Bits.concat(f(x0), Bits.concat(f(y0), Bits.concat(f(x1), f(y1))))) 
           let new_board = App.Chess.move(code, global)
           case new_board{
             none: App.set_local!(local@selected <- none)
-            some: 
+            some:             
               let code = Bits.show(code)
-              let new_team = Bits.not(local@team)                
+              let team = Bits.not(team)
               IO {
                 App.new_post!(room, code)
                 let local = local@selected <- none             
-                let local = local@team <- new_team                                
+                let local = local@team <- some(team)                              
                 App.set_local!(local)          
             }
           } 
@@ -938,6 +942,10 @@ App.Chess.when: App.When<App.Chess.State>
     mouse_move:
       let local = local@mouse_pos <- event.mouse_pos
       App.set_local!(local)
+    
+    key_down:
+      log(List.show!((board) Bits.show_reverse(board) |"\n", global))
+      App.pass!
   } default App.pass!
 
 
@@ -949,9 +957,10 @@ App.Chess.post: App.Post<App.Chess.State>
   (time, room, addr, data, glob)
   let code = Bits.read(data)
   // App.Chess.move(code, glob)
-  case code {
+  log(Bits.show_reverse(code))
+  case code {    
     o: 
-      let new_board = App.Chess.move(code.pred, glob)
+      let new_board = App.Chess.move(code.pred, glob)      
       case new_board{
         none: glob
         some: new_board.value
