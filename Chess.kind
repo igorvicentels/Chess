@@ -13,7 +13,7 @@ App.Chess.Board: Type
   List<Bits>
 
 App.Chess.room: String
-  "Chess_Room_14477"
+  "Chess_Room_211"
 
 App.Chess.scale: U32
   2
@@ -621,28 +621,31 @@ App.Chess.find_piece_aux(index: Nat, piece: Bits, board: App.Chess.Board) : Mayb
     App.Chess.find_piece_aux(index + 4, piece, board)
 
 App.Chess.is_checked(x0: Nat, y0: Nat, board: App.Chess.Board): Bool
-  let straight = App.Chess.is_checked_straight(x0, y0, board) 
+  let line     = App.Chess.is_checked_line(x0, y0, board) 
   let diagonal = App.Chess.is_checked_diagonal(x0, y0, board) 
   let knight   = App.Chess.is_checked_knight(x0, y0, board)
   let pawn     = App.Chess.is_checked_pawn(x0, y0, board)
-  straight || diagonal || knight || pawn 
+  let king     = App.Chess.is_checked_king(x0, y0, board)
+  line || diagonal || knight || pawn || king 
 
-App.Chess.is_checked_straight(x0: Nat, y0: Nat, board: App.Chess.Board): Bool
-  let x1 = Nat.to_int(x0)
-  let y1 = Nat.to_int(y0)
-  let up    = App.Chess.is_checked_straight_up(x0, y0, x1, y1 - 1, board)
-  let down  = App.Chess.is_checked_straight_down(x0, y0, x1, y1 + 1, board)
-  let left  = App.Chess.is_checked_straight_left(x0, y0, x1 - 1, y1, board)
-  let right = App.Chess.is_checked_straight_right(x0, y0, x1 + 1, y1, board)
+App.Chess.is_checked_line(x0: Nat, y0: Nat, board: App.Chess.Board): Bool
+  let id    = (a: Int) a 
+  let add   = (a: Int) Int.add(a, 1)
+  let sub   = (a: Int) Int.sub(a, 1)
+  let x1    = Nat.to_int(x0)
+  let y1    = Nat.to_int(y0)
+  let up    = App.Chess.is_checked_line_aux(x0, y0, x1, y1 - 1, id, sub, board)
+  let down  = App.Chess.is_checked_line_aux(x0, y0, x1, y1 + 1, id, add, board)
+  let left  = App.Chess.is_checked_line_aux(x0, y0, x1 - 1, y1, sub, id, board)
+  let right = App.Chess.is_checked_line_aux(x0, y0, x1 + 1, y1, add, id, board)
   up || down || left || right
 
-
-App.Chess.is_checked_straight_up(x0: Nat, y0: Nat, x1: Int, y1: Int, board: App.Chess.Board): Bool 
-  if Int.ltn(y1, 0) then
+App.Chess.is_checked_line_aux(x0: Nat, y0: Nat, x1: Int, y1: Int, fx: Int -> Int, fy: Int -> Int, board: App.Chess.Board): Bool 
+  if Int.ltn(y1, 0) || Int.gtn(y1, 7) || Int.ltn(x1, 0) || Int.gtn(x1, 7) then
     false      
   else
     if Bits.eql(App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board), Bits.o(Bits.o(Bits.o(Bits.o(Bits.e))))) then
-      App.Chess.is_checked_straight_up(x0, y0, x1, y1 - 1, board)
+      App.Chess.is_checked_line_aux(x0, y0, fx(x1), fy(y1),fx, fy, board)
     else 
       if Bits.eql(Bits.slice(1, App.Chess.get(x0, y0, board)), Bits.slice(1, App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board))) then
         false
@@ -651,228 +654,52 @@ App.Chess.is_checked_straight_up(x0: Nat, y0: Nat, x1: Int, y1: Int, board: App.
         || Bits.eql(Bits.drop(1, App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board)), Bits.o(Bits.i(Bits.o(Bits.e))))
 
 
-App.Chess.is_checked_straight_down(x0: Nat, y0: Nat, x1: Int, y1: Int, board: App.Chess.Board): Bool 
-  if Int.gtn(y1, 7) then 
-    false      
-  else
-    if Bits.eql(App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board), Bits.o(Bits.o(Bits.o(Bits.o(Bits.e))))) then 
-      App.Chess.is_checked_straight_down(x0, y0, x1, y1 + 1, board)
-    else 
-      if Bits.eql(Bits.slice(1, App.Chess.get(x0, y0, board)), Bits.slice(1, App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board))) then 
-        false
-      else
-        Bits.eql(Bits.drop(1, App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board)), Bits.i(Bits.o(Bits.i(Bits.e)))) 
-        || Bits.eql(Bits.drop(1, App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board)), Bits.o(Bits.i(Bits.o(Bits.e))))
-
-
-App.Chess.is_checked_straight_left(x0: Nat, y0: Nat, x1: Int, y1: Int, board: App.Chess.Board): Bool 
-  if Int.ltn(x1, 0) then 
-    false      
-  else
-    if Bits.eql(App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board), Bits.o(Bits.o(Bits.o(Bits.o(Bits.e))))) then 
-      App.Chess.is_checked_straight_left(x0, y0, x1 - 1, y1, board)
-    else 
-      if Bits.eql(Bits.slice(1, App.Chess.get(x0, y0, board)), Bits.slice(1, App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board))) then 
-        false
-      else
-        Bits.eql(Bits.drop(1, App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board)), Bits.i(Bits.o(Bits.i(Bits.e)))) 
-        || Bits.eql(Bits.drop(1, App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board)), Bits.o(Bits.i(Bits.o(Bits.e))))
-
-App.Chess.is_checked_straight_right(x0: Nat, y0: Nat, x1: Int, y1: Int, board: App.Chess.Board): Bool
-  if Int.gtn(x1, 7) then 
-    false      
-  else
-    if Bits.eql(App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board), Bits.o(Bits.o(Bits.o(Bits.o(Bits.e))))) then 
-      App.Chess.is_checked_straight_right(x0, y0, x1 + 1, y1, board)
-    else 
-      if Bits.eql(Bits.slice(1, App.Chess.get(x0, y0, board)), Bits.slice(1, App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board))) then 
-        false
-      else
-        Bits.eql(Bits.drop(1, App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board)), Bits.i(Bits.o(Bits.i(Bits.e)))) 
-        || Bits.eql(Bits.drop(1, App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board)), Bits.o(Bits.i(Bits.o(Bits.e))))
-
-
-
 App.Chess.is_checked_diagonal(x0: Nat, y0: Nat, board: App.Chess.Board): Bool
-  let x1 = Nat.to_int(x0)
-  let y1 = Nat.to_int(y0)
-  let aux1  = App.Chess.is_checked_diagonal_aux1(x0, y0, x1 + 1, y1 - 1, board) //1Q
-  let aux2  = App.Chess.is_checked_diagonal_aux2(x0, y0, x1 - 1, y1 - 1, board) //2Q
-  let aux3  = App.Chess.is_checked_diagonal_aux3(x0, y0, x1 - 1, y1 + 1, board) //3Q
-  let aux4  = App.Chess.is_checked_diagonal_aux4(x0, y0, x1 + 1, y1 + 1, board) //4Q
-  aux1 || aux2 || aux3 || aux4
+  let add = (a: Int) Int.add(a, 1)
+  let sub = (a: Int) Int.sub(a, 1)
+  let x1  = Nat.to_int(x0)
+  let y1  = Nat.to_int(y0)
+  let q1  = App.Chess.is_checked_diagonal_aux(x0, y0, x1 + 1, y1 - 1, add, sub, board) 
+  let q2  = App.Chess.is_checked_diagonal_aux(x0, y0, x1 - 1, y1 - 1, sub, sub, board) 
+  let q3  = App.Chess.is_checked_diagonal_aux(x0, y0, x1 - 1, y1 + 1, sub, add, board) 
+  let q4  = App.Chess.is_checked_diagonal_aux(x0, y0, x1 + 1, y1 + 1, add, add, board) 
+  q1 || q2 || q3 || q4
 
-
-
-App.Chess.is_checked_diagonal_aux1(x0: Nat, y0: Nat, x1: Int, y1: Int, board: App.Chess.Board): Bool
-  if Int.gtn(x1, 7) || Int.ltn(y1, 0) then
+App.Chess.is_checked_diagonal_aux(x0: Nat, y0: Nat, x1: Int, y1: Int, fx: Int -> Int, fy:  Int -> Int, board: App.Chess.Board): Bool
+  let tile = App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board)
+  if Int.ltn(x1, 0) || Int.ltn(y1, 0) || Int.gtn(x1, 7) || Int.gtn(y1, 7) then
     false      
   else
-    if Bits.eql(App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board), Bits.o(Bits.o(Bits.o(Bits.o(Bits.e))))) then
-      App.Chess.is_checked_diagonal_aux1(x0, y0, x1 + 1, y1 - 1, board)
+    if Bits.eql(tile, Bits.o(Bits.o(Bits.o(Bits.o(Bits.e))))) then
+      App.Chess.is_checked_diagonal_aux(x0, y0, fx(x1), fy(y1), fx, fy, board)
     else 
-      if Bits.eql(Bits.slice(1, App.Chess.get(x0, y0, board)), Bits.slice(1, App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board))) then
+      if Bits.eql(Bits.slice(1, App.Chess.get(x0, y0, board)), Bits.slice(1, tile)) then
         false
       else
-        Bits.eql(Bits.drop(1, App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board)), Bits.o(Bits.o(Bits.i(Bits.e)))) 
-        || Bits.eql(Bits.drop(1, App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board)), Bits.i(Bits.o(Bits.i(Bits.e))))
-
-App.Chess.is_checked_diagonal_aux2(x0: Nat, y0: Nat, x1: Int, y1: Int, board: App.Chess.Board): Bool
-  if Int.ltn(x1, 0) || Int.ltn(y1, 0) then 
-    false      
-  else
-    if Bits.eql(App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board), Bits.o(Bits.o(Bits.o(Bits.o(Bits.e))))) then  
-      App.Chess.is_checked_diagonal_aux2(x0, y0, x1 - 1, y1 - 1, board)
-    else 
-      if Bits.eql(Bits.slice(1, App.Chess.get(x0, y0, board)), Bits.slice(1, App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board))) then 
-        false
-      else
-        Bits.eql(Bits.drop(1, App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board)), Bits.o(Bits.o(Bits.i(Bits.e)))) 
-        || Bits.eql(Bits.drop(1, App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board)), Bits.i(Bits.o(Bits.i(Bits.e))))
-
-
-App.Chess.is_checked_diagonal_aux3(x0: Nat, y0: Nat, x1: Int, y1: Int, board: App.Chess.Board): Bool
-  if Int.ltn(x1, 0) || Int.gtn(y1, 7) then 
-    false      
-  else
-    if Bits.eql(App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board), Bits.o(Bits.o(Bits.o(Bits.o(Bits.e))))) then  
-      App.Chess.is_checked_diagonal_aux3(x0, y0, x1 - 1, y1 + 1, board)
-    else 
-      if Bits.eql(Bits.slice(1, App.Chess.get(x0, y0, board)), Bits.slice(1, App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board))) then 
-        false
-      else
-        Bits.eql(Bits.drop(1, App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board)), Bits.o(Bits.o(Bits.i(Bits.e)))) 
-        || Bits.eql(Bits.drop(1, App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board)), Bits.i(Bits.o(Bits.i(Bits.e))))
-
-App.Chess.is_checked_diagonal_aux4(x0: Nat, y0: Nat, x1: Int, y1: Int, board: App.Chess.Board): Bool
-  if Int.gtn(x1, 7) || Int.gtn(y1, 7) then 
-    false      
-  else
-    if Bits.eql(App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board), Bits.o(Bits.o(Bits.o(Bits.o(Bits.e))))) then  
-      App.Chess.is_checked_diagonal_aux4(x0, y0, x1 + 1, y1 + 1, board)
-    else 
-      if Bits.eql(Bits.slice(1, App.Chess.get(x0, y0, board)), Bits.slice(1, App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board))) then 
-        false
-      else
-        Bits.eql(Bits.drop(1, App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board)), Bits.o(Bits.o(Bits.i(Bits.e)))) 
-        || Bits.eql(Bits.drop(1, App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board)), Bits.i(Bits.o(Bits.i(Bits.e))))
-
+        Bits.eql(Bits.drop(1, tile), Bits.o(Bits.o(Bits.i(Bits.e))))
+        || Bits.eql(Bits.drop(1, tile), Bits.i(Bits.o(Bits.i(Bits.e))))
 
 App.Chess.is_checked_knight(x0: Nat, y0: Nat, board: App.Chess.Board): Bool 
   let x1 = Nat.to_int(x0)
   let y1 = Nat.to_int(y0)
-  let aux1 = App.Chess.is_checked_knight_aux1(x0, y0, x1 + 1, y1 + 2, board)
-  let aux2 = App.Chess.is_checked_knight_aux2(x0, y0, x1 + 1, y1 - 2, board)
-  let aux3 = App.Chess.is_checked_knight_aux3(x0, y0, x1 - 1, y1 + 2, board)
-  let aux4 = App.Chess.is_checked_knight_aux4(x0, y0, x1 - 1, y1 - 2, board)
-  let aux5 = App.Chess.is_checked_knight_aux5(x0, y0, x1 + 2, y1 + 1, board)
-  let aux6 = App.Chess.is_checked_knight_aux6(x0, y0, x1 + 2, y1 - 1, board)
-  let aux7 = App.Chess.is_checked_knight_aux7(x0, y0, x1 - 2, y1 + 1, board)
-  let aux8 = App.Chess.is_checked_knight_aux8(x0, y0, x1 - 2, y1 - 1, board)
+  let aux1 = App.Chess.is_checked_knight_aux(x0, y0, x1 + 1, y1 + 2, board)
+  let aux2 = App.Chess.is_checked_knight_aux(x0, y0, x1 + 1, y1 - 2, board)
+  let aux3 = App.Chess.is_checked_knight_aux(x0, y0, x1 - 1, y1 + 2, board)
+  let aux4 = App.Chess.is_checked_knight_aux(x0, y0, x1 - 1, y1 - 2, board)
+  let aux5 = App.Chess.is_checked_knight_aux(x0, y0, x1 + 2, y1 + 1, board)
+  let aux6 = App.Chess.is_checked_knight_aux(x0, y0, x1 + 2, y1 - 1, board)
+  let aux7 = App.Chess.is_checked_knight_aux(x0, y0, x1 - 2, y1 + 1, board)
+  let aux8 = App.Chess.is_checked_knight_aux(x0, y0, x1 - 2, y1 - 1, board)
   aux1 || aux2 || aux3 || aux4 || aux5 || aux6 || aux7 || aux8
 
-
-
-App.Chess.is_checked_knight_aux1(x0: Nat, y0: Nat, x1: Int, y1: Int, board: App.Chess.Board): Bool
-  if Int.gtn(x1, 7) || Int.gtn(y1, 7) then 
-    false      
-  else
-    if Bits.eql(App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board), Bits.o(Bits.o(Bits.o(Bits.o(Bits.e))))) then  
+App.Chess.is_checked_knight_aux(x0: Nat, y0: Nat, x1: Int, y1: Int, board: App.Chess.Board): Bool
+  if Bits.eql(App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board), Bits.o(Bits.o(Bits.o(Bits.o(Bits.e))))) then  
+    false
+  else 
+    if Bits.eql(Bits.slice(1, App.Chess.get(x0, y0, board)), Bits.slice(1, App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board))) then 
       false
-    else 
-      if Bits.eql(Bits.slice(1, App.Chess.get(x0, y0, board)), Bits.slice(1, App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board))) then 
-        false
-      else
-        Bits.eql(Bits.drop(1, App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board)), Bits.i(Bits.i(Bits.o(Bits.e))))
-
-App.Chess.is_checked_knight_aux2(x0: Nat, y0: Nat, x1: Int, y1: Int, board: App.Chess.Board): Bool
-  if Int.gtn(x1, 7) || Int.ltn(y1, 0) then 
-    false      
-  else
-    if Bits.eql(App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board), Bits.o(Bits.o(Bits.o(Bits.o(Bits.e))))) then  
-      false
-    else 
-      if Bits.eql(Bits.slice(1, App.Chess.get(x0, y0, board)), Bits.slice(1, App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board))) then 
-        false
-      else
-        Bits.eql(Bits.drop(1, App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board)), Bits.i(Bits.i(Bits.o(Bits.e))))
-
-
-App.Chess.is_checked_knight_aux3(x0: Nat, y0: Nat, x1: Int, y1: Int, board: App.Chess.Board): Bool
-  if Int.ltn(x1, 0) || Int.gtn(y1, 7) then 
-    false      
-  else
-    if Bits.eql(App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board), Bits.o(Bits.o(Bits.o(Bits.o(Bits.e))))) then  
-      false
-    else 
-      if Bits.eql(Bits.slice(1, App.Chess.get(x0, y0, board)), Bits.slice(1, App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board))) then 
-        false
-      else
-        Bits.eql(Bits.drop(1, App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board)), Bits.i(Bits.i(Bits.o(Bits.e))))
-
-App.Chess.is_checked_knight_aux4(x0: Nat, y0: Nat, x1: Int, y1: Int, board: App.Chess.Board): Bool
-  if Int.ltn(x1, 0) || Int.ltn(y1, 0) then 
-    false      
-  else
-    if Bits.eql(App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board), Bits.o(Bits.o(Bits.o(Bits.o(Bits.e))))) then  
-      false
-    else 
-      if Bits.eql(Bits.slice(1, App.Chess.get(x0, y0, board)), Bits.slice(1, App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board))) then 
-        false
-      else
-        Bits.eql(Bits.drop(1, App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board)), Bits.i(Bits.i(Bits.o(Bits.e)))) 
-
-
-App.Chess.is_checked_knight_aux5(x0: Nat, y0: Nat, x1: Int, y1: Int, board: App.Chess.Board): Bool
-  if Int.gtn(x1, 7) || Int.gtn(y1, 7) then 
-    false      
-  else
-    if Bits.eql(App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board), Bits.o(Bits.o(Bits.o(Bits.o(Bits.e))))) then  
-      false
-    else 
-      if Bits.eql(Bits.slice(1, App.Chess.get(x0, y0, board)), Bits.slice(1, App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board))) then 
-        false
-      else
-        Bits.eql(Bits.drop(1, App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board)), Bits.i(Bits.i(Bits.o(Bits.e))))
-
-
-App.Chess.is_checked_knight_aux6(x0: Nat, y0: Nat, x1: Int, y1: Int, board: App.Chess.Board): Bool
-  if Int.gtn(x1, 7) || Int.ltn(y1, 0) then 
-    false      
-  else
-    if Bits.eql(App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board), Bits.o(Bits.o(Bits.o(Bits.o(Bits.e))))) then  
-      false
-    else 
-      if Bits.eql(Bits.slice(1, App.Chess.get(x0, y0, board)), Bits.slice(1, App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board))) then 
-        false
-      else
-        Bits.eql(Bits.drop(1, App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board)), Bits.i(Bits.i(Bits.o(Bits.e)))) 
-
-
-App.Chess.is_checked_knight_aux7(x0: Nat, y0: Nat, x1: Int, y1: Int, board: App.Chess.Board): Bool
-  if Int.ltn(x1, 0) || Int.gtn(y1, 7) then 
-    false      
-  else
-    if Bits.eql(App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board), Bits.o(Bits.o(Bits.o(Bits.o(Bits.e))))) then  
-      false
-    else 
-      if Bits.eql(Bits.slice(1, App.Chess.get(x0, y0, board)), Bits.slice(1, App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board))) then 
-        false
-      else
-        Bits.eql(Bits.drop(1, App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board)), Bits.i(Bits.i(Bits.o(Bits.e))))
-  
-App.Chess.is_checked_knight_aux8(x0: Nat, y0: Nat, x1: Int, y1: Int, board: App.Chess.Board): Bool
-  if Int.ltn(x1, 0) || Int.ltn(y1, 0) then 
-    false      
-  else
-    if Bits.eql(App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board), Bits.o(Bits.o(Bits.o(Bits.o(Bits.e))))) then  
-      false
-    else 
-      if Bits.eql(Bits.slice(1, App.Chess.get(x0, y0, board)), Bits.slice(1, App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board))) then 
-        false
-      else
-        Bits.eql(Bits.drop(1, App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board)), Bits.i(Bits.i(Bits.o(Bits.e))))
-
+    else
+      Bits.eql(Bits.drop(1, App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board)), Bits.i(Bits.i(Bits.o(Bits.e))))
 
 App.Chess.is_checked_pawn(x0: Nat, y0: Nat, board: App.Chess.Board): Bool
   if Bits.eql(Bits.slice(1, App.Chess.get(x0, y0, board)), Bits.o(Bits.e)) then
@@ -892,6 +719,19 @@ App.Chess.is_checked_pawn_black(x0: Nat, y0: Nat, board: App.Chess.Board): Bool
   let white_pawn = Bits.o(Bits.i(Bits.o(Bits.o(Bits.e))))
   Bits.eql(tile1, white_pawn) || Bits.eql(tile2, white_pawn)
 
+App.Chess.is_checked_king(x0: Nat, y0: Nat, board: App.Chess.Board): Bool
+  let team = Bits.slice(1, App.Chess.get(x0, y0, board))
+  let get_tile = (x: Nat, y: Nat) App.Chess.get(x, y, board)
+  let tile     = App.Chess.get(x0, y0, board)
+  let king     = Bits.concat(Bits.not(team), Bits.o(Bits.i(Bits.i(Bits.e))))
+  Bits.eql(get_tile(x0 - 1, y0 - 1), king) ||
+  Bits.eql(get_tile(x0    , y0 - 1), king) ||
+  Bits.eql(get_tile(x0 + 1, y0 - 1), king) ||
+  Bits.eql(get_tile(x0 - 1, y0    ), king) ||
+  Bits.eql(get_tile(x0 + 1, y0    ), king) ||
+  Bits.eql(get_tile(x0 - 1, y0 + 1), king) ||
+  Bits.eql(get_tile(x0    , y0 + 1), king) ||
+  Bits.eql(get_tile(x0 + 1, y0 + 1), king) 
 
 App.Chess.mouse_to_coord(mouse_pos: Pair<U32, U32>): Pair<Nat, Nat>
   let scale     = App.Chess.scale
