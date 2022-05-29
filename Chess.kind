@@ -319,6 +319,124 @@ App.Chess.is_move_possible_knight(x0: Int, y0: Int, x1: Int, y1: Int, board: App
 App.Chess.is_move_possible_king(x0: Int, y0: Int, x1: Int, y1: Int, board: App.Chess.Board): Bool
   Nat.lte(Int.abs(x0 - x1), 1) && Nat.lte(Int.abs(y0 - y1), 1)
 
+App.Chess.is_checkmate(board: App.Chess.Board): Bool
+  let team       = App.Chess.next_player(board)
+  let in_check   = App.Chess.in_check(team, board)
+  
+  if in_check then 
+    let king =
+      if Bits.eql(team, Bits.o(Bits.e)) then
+          Bits.o(Bits.o(Bits.i(Bits.i(Bits.e))))
+      else
+          Bits.i(Bits.o(Bits.i(Bits.i(Bits.e))))
+
+    let {xk, yk} = App.Chess.find_piece(king, board) <> {8, 8} //Pair.new!!<8,8>
+    let king_up    = 
+      let is_possible = App.Chess.is_move_possible(xk, yk, xk, yk - 1, team, board)
+      let move        = App.Chess.move.aux(xk, yk, xk, yk - 1, team, board)
+      let still_check = App.Chess.in_check(team, move)
+      Nat.ltn(yk - 1, 0)|| Bool.not(is_possible) || still_check
+      log("Up: " | Bool.show(king_up))
+
+    let king_down  =
+      let is_possible = App.Chess.is_move_possible(xk, yk, xk, yk + 1, team, board)
+      let move        = App.Chess.move.aux(xk, yk, xk, yk + 1, team, board)
+      let still_check = App.Chess.in_check(team, move)
+      Nat.gtn(yk + 1, 7)|| Bool.not(is_possible) || still_check
+      log("down: " | Bool.show(king_down))
+
+    let king_right = 
+      let is_possible = App.Chess.is_move_possible(xk, yk, xk + 1, yk, team, board)
+      let move        = App.Chess.move.aux(xk, yk, xk + 1, yk, team, board)
+      let still_check = App.Chess.in_check(team, move)
+      Nat.gtn(xk + 1, 7)|| Bool.not(is_possible) || still_check //bom verificar o is_possible pro rei em relação ao limite do board
+      log("right: " | Bool.show(king_right))
+
+    let king_left  = 
+      let is_possible = App.Chess.is_move_possible(xk, yk, xk - 1, yk, team, board)
+      let move        = App.Chess.move.aux(xk, yk, xk - 1, yk, team, board)
+      let still_check = App.Chess.in_check(team, move)
+      Nat.ltn(xk - 1, 0)|| Bool.not(is_possible) || still_check
+      log("left: " | Bool.show(king_left))
+
+    let king_ne  = 
+      let is_possible = App.Chess.is_move_possible(xk, yk, xk + 1, yk - 1, team, board)
+      let move        = App.Chess.move.aux(xk, yk, xk + 1, yk - 1, team, board)
+      let still_check = App.Chess.in_check(team, move)
+      Nat.gtn(xk + 1, 7) || Nat.ltn(yk - 1, 0)|| Bool.not(is_possible) || still_check
+      log("ne: " | Bool.show(king_ne))
+
+    let king_nw  = 
+      let is_possible = App.Chess.is_move_possible(xk, yk, xk - 1, yk - 1, team, board)
+      let move        = App.Chess.move.aux(xk, yk, xk - 1, yk - 1, team, board)
+      let still_check = App.Chess.in_check(team, move)
+      Nat.ltn(xk - 1, 0) || Nat.ltn(yk - 1, 0)|| Bool.not(is_possible) || still_check
+      log("nw: " | Bool.show(king_nw))
+
+    let king_se  = 
+      let is_possible = App.Chess.is_move_possible(xk, yk, xk + 1, yk + 1, team, board)
+      let move        = App.Chess.move.aux(xk, yk, xk + 1, yk + 1, team, board)
+      let still_check = App.Chess.in_check(team, move)
+      Nat.gtn(xk + 1, 7) || Nat.gtn(yk + 1, 7)|| Bool.not(is_possible) || still_check
+      log("se: " | Bool.show(king_se))
+
+    let king_sw  = 
+      let is_possible = App.Chess.is_move_possible(xk, yk, xk - 1, yk + 1, team, board)
+      let move        = App.Chess.move.aux(xk, yk, xk - 1, yk + 1, team, board)
+      let still_check = App.Chess.in_check(team, move)
+      Nat.ltn(xk - 1, 0) || Nat.gtn(yk + 1, 7)|| Bool.not(is_possible) || still_check
+      log("sw: " | Bool.show(king_sw))
+
+    let can_capture_attacker = 
+      let x = Bits.to_nat(Bits.slice(3,Bits.drop(19, board[4] <> Bits.e)))
+      let y = Bits.to_nat(Bits.slice(3,Bits.drop(22, board[4] <> Bits.e)))
+      App.Chess.is_checked(x, y, board)
+      log("capture_attacker: " | Bool.show(can_capture_attacker))
+    
+    let double_check =
+      let x0 =  Bits.to_nat(Bits.slice(3,Bits.drop(13, board[4] <> Bits.e)))
+      let y0 =  Bits.to_nat(Bits.slice(3,Bits.drop(16, board[4] <> Bits.e)))
+      let x1 =  Bits.to_nat(Bits.slice(3,Bits.drop(19, board[4] <> Bits.e)))
+      let y1 =  Bits.to_nat(Bits.slice(3,Bits.drop(22, board[4] <> Bits.e)))
+      
+      if x1 =? xk then 
+        if y0 =? y1 then
+          App.Chess.is_checked_diagonal(xk, yk, board)
+        else
+          let id    = (a: Int) a 
+          let add   = (a: Int) Int.add(a, 1)
+          let sub   = (a: Int) Int.sub(a, 1)
+          let xk1    = Nat.to_int(xk)
+          let yk1    = Nat.to_int(yk)
+          let left  = App.Chess.is_checked_line_aux(xk, yk, xk1 - 1, yk1, sub, id, board)
+          let right = App.Chess.is_checked_line_aux(xk, yk, xk1 + 1, yk1, add, id, board)
+          left || right
+
+      else 
+        if y1 =? yk then
+          if x0 =? x1 then 
+            App.Chess.is_checked_diagonal(xk, yk, board)
+          else 
+            let id    = (a: Int) a 
+            let add   = (a: Int) Int.add(a, 1)
+            let sub   = (a: Int) Int.sub(a, 1)
+            let xk1    = Nat.to_int(xk)
+            let yk1    = Nat.to_int(yk)
+            let up    = App.Chess.is_checked_line_aux(xk, yk, xk1, yk1 - 1, id, sub, board)
+            let down  = App.Chess.is_checked_line_aux(xk, yk, xk1, yk1 + 1, id, add, board)
+            up || down
+        else 
+          if Nat.eql(Int.abs(Nat.to_int(x0) - Nat.to_int(x1)), Int.abs(Nat.to_int(y0) - Nat.to_int(y1))) then
+            App.Chess.is_checked_line(xk, yk, board)
+          else
+             App.Chess.is_checked_line(xk, yk, board) || App.Chess.is_checked_diagonal(xk, yk, board) 
+
+    
+    log("double_check: " | Bool.show(double_check))
+    king_up && king_down && king_right && king_left && king_ne && king_nw && king_se && king_sw && (Bool.not(can_capture_attacker) || double_check)
+  
+  else
+    false
 
 App.Chess.move(code: Bits, board: App.Chess.Board): Maybe<App.Chess.Board>
   let team = Bits.slice(1,code)
