@@ -13,7 +13,7 @@ App.Chess.Board: Type
   List<Bits>
 
 App.Chess.room: String
-  "Chess_Room_211"
+  "Chess_Room_251"
 
 App.Chess.scale: U32
   2
@@ -191,6 +191,7 @@ App.Chess.is_castle_possible(x0: Nat, y0: Nat, x1: Nat, y1: Nat, board: App.Ches
       && Nat.eql(x1, 2) 
       && Nat.eql(y1, 0) 
       && Bits.eql(Bits.o(Bits.e), Bits.slice(1, Bits.drop(1, board[4] <> Bits.e)))
+      && Bool.not(App.Chess.is_checked(3, 0, board))
  
   let black_r =
     Nat.eql(x0, 4) 
@@ -201,6 +202,7 @@ App.Chess.is_castle_possible(x0: Nat, y0: Nat, x1: Nat, y1: Nat, board: App.Ches
     && Nat.eql(x1, 6) 
     && Nat.eql(y1, 0) 
     && Bits.eql(Bits.o(Bits.e), Bits.slice(1, Bits.drop(2, board[4] <> Bits.e)))
+    && Bool.not(App.Chess.is_checked(5, 0, board))
   
   let white_l =
     Nat.eql(x0, 4) 
@@ -212,6 +214,7 @@ App.Chess.is_castle_possible(x0: Nat, y0: Nat, x1: Nat, y1: Nat, board: App.Ches
     && Nat.eql(x1, 2) 
     && Nat.eql(y1, 7) 
     && Bits.eql(Bits.o(Bits.e), Bits.slice(1, Bits.drop(3, board[4] <> Bits.e)))
+    && Bool.not(App.Chess.is_checked(3, 7, board))
     
   let white_r =
     Nat.eql(x0, 4) 
@@ -222,6 +225,7 @@ App.Chess.is_castle_possible(x0: Nat, y0: Nat, x1: Nat, y1: Nat, board: App.Ches
     && Nat.eql(x1, 6) 
     && Nat.eql(y1, 7) 
     && Bits.eql(Bits.o(Bits.e), Bits.slice(1, Bits.drop(4, board[4] <> Bits.e)))
+    && Bool.not(App.Chess.is_checked(5, 7, board))
 
   black_l || black_r || white_l || white_r
 
@@ -720,18 +724,19 @@ App.Chess.is_checked_pawn_black(x0: Nat, y0: Nat, board: App.Chess.Board): Bool
   Bits.eql(tile1, white_pawn) || Bits.eql(tile2, white_pawn)
 
 App.Chess.is_checked_king(x0: Nat, y0: Nat, board: App.Chess.Board): Bool
-  let team = Bits.slice(1, App.Chess.get(x0, y0, board))
-  let get_tile = (x: Nat, y: Nat) App.Chess.get(x, y, board)
-  let tile     = App.Chess.get(x0, y0, board)
-  let king     = Bits.concat(Bits.not(team), Bits.o(Bits.i(Bits.i(Bits.e))))
-  Bits.eql(get_tile(x0 - 1, y0 - 1), king) ||
-  Bits.eql(get_tile(x0    , y0 - 1), king) ||
-  Bits.eql(get_tile(x0 + 1, y0 - 1), king) ||
-  Bits.eql(get_tile(x0 - 1, y0    ), king) ||
-  Bits.eql(get_tile(x0 + 1, y0    ), king) ||
-  Bits.eql(get_tile(x0 - 1, y0 + 1), king) ||
-  Bits.eql(get_tile(x0    , y0 + 1), king) ||
-  Bits.eql(get_tile(x0 + 1, y0 + 1), king) 
+  // let team = Bits.slice(1, App.Chess.get(x0, y0, board))
+  // let get_tile = (x: Nat, y: Nat) App.Chess.get(x, y, board)
+  // let tile     = App.Chess.get(x0, y0, board)
+  // let king     = Bits.concat(Bits.not(team), Bits.o(Bits.i(Bits.i(Bits.e))))
+  // Bits.eql(get_tile(x0 - 1, y0 - 1), king) ||
+  // Bits.eql(get_tile(x0    , y0 - 1), king) ||
+  // Bits.eql(get_tile(x0 + 1, y0 - 1), king) ||
+  // Bits.eql(get_tile(x0 - 1, y0    ), king) ||
+  // Bits.eql(get_tile(x0 + 1, y0    ), king) ||
+  // Bits.eql(get_tile(x0 - 1, y0 + 1), king) ||
+  // Bits.eql(get_tile(x0    , y0 + 1), king) ||
+  // Bits.eql(get_tile(x0 + 1, y0 + 1), king) 
+  false
 
 App.Chess.mouse_to_coord(mouse_pos: Pair<U32, U32>): Pair<Nat, Nat>
   let scale     = App.Chess.scale
