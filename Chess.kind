@@ -13,7 +13,7 @@ App.Chess.Board: Type
   List<Bits>
 
 App.Chess.room: String
-  "Chess_Room_251"
+  "Chess_Room_260"
 
 App.Chess.scale: U32
   2
@@ -724,19 +724,20 @@ App.Chess.is_checked_pawn_black(x0: Nat, y0: Nat, board: App.Chess.Board): Bool
   Bits.eql(tile1, white_pawn) || Bits.eql(tile2, white_pawn)
 
 App.Chess.is_checked_king(x0: Nat, y0: Nat, board: App.Chess.Board): Bool
-  // let team = Bits.slice(1, App.Chess.get(x0, y0, board))
-  // let get_tile = (x: Nat, y: Nat) App.Chess.get(x, y, board)
-  // let tile     = App.Chess.get(x0, y0, board)
-  // let king     = Bits.concat(Bits.not(team), Bits.o(Bits.i(Bits.i(Bits.e))))
-  // Bits.eql(get_tile(x0 - 1, y0 - 1), king) ||
-  // Bits.eql(get_tile(x0    , y0 - 1), king) ||
-  // Bits.eql(get_tile(x0 + 1, y0 - 1), king) ||
-  // Bits.eql(get_tile(x0 - 1, y0    ), king) ||
-  // Bits.eql(get_tile(x0 + 1, y0    ), king) ||
-  // Bits.eql(get_tile(x0 - 1, y0 + 1), king) ||
-  // Bits.eql(get_tile(x0    , y0 + 1), king) ||
-  // Bits.eql(get_tile(x0 + 1, y0 + 1), king) 
-  false
+  let team     = Bits.slice(1, App.Chess.get(x0, y0, board))
+  let get_tile = (x: Int, y: Int) App.Chess.get(Int.to_nat(x), Int.to_nat(y), board)
+  let king     = Bits.concat(Bits.not(team), Bits.o(Bits.i(Bits.i(Bits.e))))
+  let x = Nat.to_int(x0)
+  let y = Nat.to_int(y0)
+
+  Bits.eql(get_tile(x - 1, y - 1), king) ||
+  Bits.eql(get_tile(x    , y - 1), king) ||
+  Bits.eql(get_tile(x + 1, y - 1), king) ||
+  Bits.eql(get_tile(x - 1, y    ), king) ||
+  Bits.eql(get_tile(x + 1, y    ), king) ||
+  Bits.eql(get_tile(x - 1, y + 1), king) ||
+  Bits.eql(get_tile(x    , y + 1), king) ||
+  Bits.eql(get_tile(x + 1, y + 1), king) 
 
 App.Chess.mouse_to_coord(mouse_pos: Pair<U32, U32>): Pair<Nat, Nat>
   let scale     = App.Chess.scale
