@@ -13,7 +13,7 @@ App.Chess.Board: Type
   List<Bits>
 
 App.Chess.room: String
-  "Chess_Room_280"
+  "Chess_Room_301"
 
 App.Chess.scale: U32
   2
@@ -133,7 +133,6 @@ App.Chess.draw(img: VoxBox): App.Draw<App.Chess.State>
 
 App.Chess.next_player(board: App.Chess.Board): Bits
     let last_bit = Bits.slice(1, board[4] <> Bits.e)
-    log(Bits.show(last_bit))
     last_bit
 
 App.Chess.is_move_possible(x0: Nat, y0: Nat, x1: Nat, y1: Nat, team: Bits, board: App.Chess.Board): Bool
@@ -158,6 +157,8 @@ App.Chess.is_move_possible(x0: Nat, y0: Nat, x1: Nat, y1: Nat, team: Bits, board
       let bishop = Bits.o(Bits.o(Bits.i(Bits.e)))
       let queen  = Bits.i(Bits.o(Bits.i(Bits.e)))
       let king   = Bits.o(Bits.i(Bits.i(Bits.e)))
+
+      log(List.show!(Bool.show, [is_piece_owner, is_user_turn, (is_to_tile_empty || Bool.not(is_to_tile_player))]))
 
       if (is_user_turn && is_piece_owner) && (is_to_tile_empty || Bool.not(is_to_tile_player)) then
         switch Bits.eql(Bits.drop(1, origin_tile)) {
@@ -194,7 +195,7 @@ App.Chess.is_castle_possible(x0: Nat, y0: Nat, x1: Nat, y1: Nat, board: App.Ches
       && Nat.eql(x1, 2) 
       && Nat.eql(y1, 0) 
       && Bits.eql(Bits.o(Bits.e), Bits.slice(1, Bits.drop(1, board[4] <> Bits.e)))
-      && Bool.not(App.Chess.is_attacked(3, 0, board))
+      && Bool.not(App.Chess.is_attacked(3, 0, board)@fst)
  
   let black_r =
     Nat.eql(x0, 4) 
@@ -205,7 +206,7 @@ App.Chess.is_castle_possible(x0: Nat, y0: Nat, x1: Nat, y1: Nat, board: App.Ches
     && Nat.eql(x1, 6) 
     && Nat.eql(y1, 0) 
     && Bits.eql(Bits.o(Bits.e), Bits.slice(1, Bits.drop(2, board[4] <> Bits.e)))
-    && Bool.not(App.Chess.is_attacked(5, 0, board))
+    && Bool.not(App.Chess.is_attacked(5, 0, board)@fst)
   
   let white_l =
     Nat.eql(x0, 4) 
@@ -217,7 +218,7 @@ App.Chess.is_castle_possible(x0: Nat, y0: Nat, x1: Nat, y1: Nat, board: App.Ches
     && Nat.eql(x1, 2) 
     && Nat.eql(y1, 7) 
     && Bits.eql(Bits.o(Bits.e), Bits.slice(1, Bits.drop(3, board[4] <> Bits.e)))
-    && Bool.not(App.Chess.is_attacked(3, 7, board))
+    && Bool.not(App.Chess.is_attacked(3, 7, board)@fst)
     
   let white_r =
     Nat.eql(x0, 4) 
@@ -228,7 +229,7 @@ App.Chess.is_castle_possible(x0: Nat, y0: Nat, x1: Nat, y1: Nat, board: App.Ches
     && Nat.eql(x1, 6) 
     && Nat.eql(y1, 7) 
     && Bits.eql(Bits.o(Bits.e), Bits.slice(1, Bits.drop(4, board[4] <> Bits.e)))
-    && Bool.not(App.Chess.is_attacked(5, 7, board))
+    && Bool.not(App.Chess.is_attacked(5, 7, board)@fst)
 
   black_l || black_r || white_l || white_r
 
@@ -326,7 +327,7 @@ App.Chess.is_checkmate(board: App.Chess.Board): Bool
   let team       = App.Chess.next_player(board)
   let in_check   = App.Chess.in_check(team, board)
   
-  if in_check then 
+  if in_check@fst then 
     let king =
       if Bits.eql(team, Bits.o(Bits.e)) then
           Bits.o(Bits.o(Bits.i(Bits.i(Bits.e))))
@@ -367,9 +368,20 @@ App.Chess.is_checkmate(board: App.Chess.Board): Bool
       log("sw: " | Bool.show(king_sw))
 
     let can_capture_attacker = 
-      let x = Bits.to_nat(Bits.slice(3,Bits.drop(19, board[4] <> Bits.e)))
-      let y = Bits.to_nat(Bits.slice(3,Bits.drop(22, board[4] <> Bits.e)))
-      App.Chess.is_attacked(x, y, board)
+      let attacker_pos = in_check@snd
+      let x = Bits.to_nat(Bits.slice(3, attacker_pos))
+      let y = Bits.to_nat(Bits.drop(3, attacker_pos))
+      log("x: " | Nat.show(x) | "   y: " | Nat.show(y))
+      let is_attacked = App.Chess.is_attacked(x, y, board)
+      if is_attacked@fst then
+        let attacker_pos = is_attacked@snd
+        let x0 = Bits.to_nat(Bits.slice(3, attacker_pos))
+        let y0 = Bits.to_nat(Bits.drop(3, attacker_pos))
+        let move = App.Chess.move.aux(x0, y0, x, y, team, board)
+        let still_check = App.Chess.in_check(team, move)@fst
+        Bool.not(still_check)
+      else
+        false
       log("capture_attacker: " | Bool.show(can_capture_attacker))
     
     let double_check =
@@ -380,47 +392,68 @@ App.Chess.is_checkmate(board: App.Chess.Board): Bool
       
       if x1 =? xk then 
         if y0 =? y1 then
-          App.Chess.is_attacked_diagonal(xk, yk, board)
+          App.Chess.is_attacked_diagonal(xk, yk, board)@fst
         else
           let id    = (a: Int) a 
           let add   = (a: Int) Int.add(a, 1)
           let sub   = (a: Int) Int.sub(a, 1)
           let xk1    = Nat.to_int(xk)
           let yk1    = Nat.to_int(yk)
-          let left  = App.Chess.is_attacked_line_aux(xk, yk, xk1 - 1, yk1, sub, id, board)
-          let right = App.Chess.is_attacked_line_aux(xk, yk, xk1 + 1, yk1, add, id, board)
+          let left  = App.Chess.is_attacked_line_aux(xk, yk, xk1 - 1, yk1, sub, id, board)@fst
+          let right = App.Chess.is_attacked_line_aux(xk, yk, xk1 + 1, yk1, add, id, board)@fst
           left || right
 
       else 
         if y1 =? yk then
           if x0 =? x1 then 
-            App.Chess.is_attacked_diagonal(xk, yk, board)
+            App.Chess.is_attacked_diagonal(xk, yk, board)@fst
           else 
             let id    = (a: Int) a 
             let add   = (a: Int) Int.add(a, 1)
             let sub   = (a: Int) Int.sub(a, 1)
             let xk1    = Nat.to_int(xk)
             let yk1    = Nat.to_int(yk)
-            let up    = App.Chess.is_attacked_line_aux(xk, yk, xk1, yk1 - 1, id, sub, board)
-            let down  = App.Chess.is_attacked_line_aux(xk, yk, xk1, yk1 + 1, id, add, board)
+            let up    = App.Chess.is_attacked_line_aux(xk, yk, xk1, yk1 - 1, id, sub, board)@fst
+            let down  = App.Chess.is_attacked_line_aux(xk, yk, xk1, yk1 + 1, id, add, board)@fst
             up || down
         else 
           if Nat.eql(Int.abs(Nat.to_int(x0) - Nat.to_int(x1)), Int.abs(Nat.to_int(y0) - Nat.to_int(y1))) then
-            App.Chess.is_attacked_line(xk, yk, board)
+            App.Chess.is_attacked_line(xk, yk, board)@fst
           else
-             App.Chess.is_attacked_line(xk, yk, board) || App.Chess.is_attacked_diagonal(xk, yk, board) 
+             App.Chess.is_attacked_line(xk, yk, board)@fst || App.Chess.is_attacked_diagonal(xk, yk, board)@fst  
 
-    
     log("double_check: " | Bool.show(double_check))
-    king_n && king_s && king_e && king_w && king_ne && king_nw && king_se && king_sw && (Bool.not(can_capture_attacker) || double_check)
+
+    let can_block = 
+      let attacker_pos = in_check@snd
+      let x = Bits.to_nat(Bits.slice(3, attacker_pos))
+      let y = Bits.to_nat(Bits.drop(3, attacker_pos))
+      let get_f  = (a: Nat, b: Nat) App.Chess.get_f(a, b)
+      App.Chess.is_checkmate.aux(xk, yk, x, y, get_f(xk, x), get_f(yk, y), board)
+      log("block_attacker: " | Bool.show(can_block))
+
+
+    king_n && king_s && king_e && king_w && king_ne && king_nw && king_se && king_sw && 
+    (Bool.not(can_capture_attacker) || double_check) && Bool.not(can_block)
   
   else
     false
 
+App.Chess.is_checkmate.aux(x: Nat, y: Nat, x1: Nat, y1: Nat, fx: Nat -> Nat, fy: Nat -> Nat, board: App.Chess.Board): Bool
+    let x = fx(x)
+    let y = fy(y)
+    if Nat.eql(x, x1) && Nat.eql(y, y1) then
+      false
+    else
+      if App.Chess.is_attacked(x, y, board)@fst then
+        true
+      else
+        App.Chess.is_checkmate.aux(x, y, x1, y1, fx, fy, board)
+
 App.Chess.is_checkmate.king_move(x0: Nat, y0: Nat, x1: Nat, y1: Nat, team: Bits, board: App.Chess.Board): Bool
   let is_possible = App.Chess.is_move_possible(x0, y0, x1, y1, team, board)
   let move        = App.Chess.move.aux(x0, y0, x1, y1, team, board)
-  let still_check = App.Chess.in_check(team, move)
+  let still_check = App.Chess.in_check(team, move)@fst
   Bool.not(is_possible) || still_check
 
 
@@ -433,7 +466,8 @@ App.Chess.move(code: Bits, board: App.Chess.Board): Maybe<App.Chess.Board>
   let is_possible = App.Chess.is_move_possible(Bits.to_nat(x0), Bits.to_nat(y0), Bits.to_nat(x1), Bits.to_nat(y1), team, board)
   if is_possible then     
     let new_board = App.Chess.move.aux(Bits.to_nat(x0), Bits.to_nat(y0), Bits.to_nat(x1), Bits.to_nat(y1), team, board)      
-    let still_check =  App.Chess.in_check(team, new_board)
+    let still_check =  App.Chess.in_check(team, new_board)@fst
+    log(Bool.show(still_check))
     if still_check then 
       none
     else 
@@ -508,22 +542,17 @@ App.Chess.move.aux(x0: Nat, y0: Nat, x1: Nat, y1: Nat, team: Bits, board: App.Ch
   let new_board = App.Chess.set_castle_bits(x0, y0, new_board)
 
   let next_player = Bits.not(App.Chess.next_player(new_board))
-  let last_chunk  = Bits.set(0, next_player, new_board[4] <> Bits.e)  
+  let last_chunk  = Bits.set(0, next_player, new_board[4] <> Bits.e) // Set team
+  let last_move   = Bits.concat(Bits.trim(3, Nat.to_bits(x0)), Bits.concat(Bits.trim(3,Nat.to_bits(y0)), Bits.concat(Bits.trim(3, Nat.to_bits(x1)), Bits.trim(3,Nat.to_bits(y1)))))
+  let last_chunk  = Bits.set(13, last_move, last_chunk)
   let new_board   = new_board[4] <- last_chunk 
   
   new_board         
- 
-  // log(List.show!(Bits.show, new_board)) 
-  // log(Bool.show(App.Chess.is_castle_possible(4, 0, 2, 0, board)))
-  // log(Bool.show(App.Chess.is_castle_possible(4, 0, 6, 0, board)))
-  // log(Bool.show(App.Chess.is_castle_possible(4, 7, 2, 7, board)))
-  // log(Bool.show(App.Chess.is_castle_possible(4, 7, 6, 7, board)))
+
 
 App.Chess.set_en_passant(x0: Nat, y0: Nat, y1: Nat, from_tile: Bits): Bits
     if (Bits.eql(from_tile, Bits.i(Bits.i(Bits.o(Bits.o(Bits.e))))) && Nat.eql(y0, 1) && Nat.eql(y1, 3))
     || (Bits.eql(from_tile, Bits.o(Bits.i(Bits.o(Bits.o(Bits.e))))) && Nat.eql(y0, 6) && Nat.eql(y1, 4)) then
-      log(Bits.show(Bits.trim(4, Nat.to_bits(x0 + 1))))
-      log(Nat.show(Bits.to_nat(Bits.trim(4, Nat.to_bits(x0 + 1)))))
       Bits.trim(4, (Nat.to_bits(x0 + 1)))
     else    
       Bits.o(Bits.o(Bits.o(Bits.o(Bits.e))))
@@ -532,24 +561,15 @@ App.Chess.is_en_passant_possible(x0: Nat, x1: Nat, y1: Nat, from_chunk: Bits, fr
     let to_index = (x1 * 4) + (y1 * 8 * 4)
     let to_chunk = App.Chess.get_chunk(to_index, new_board)
     let to_tile = Bits.slice(4, Bits.drop(56 - to_index % 60, to_chunk))
-    log(List.show!(Bool.show, [
-    Bits.eql(Bits.drop(1, from_tile), (Bits.i(Bits.o(Bits.o(Bits.e)))))
-    (Nat.eql(x0 - x1, 1) || Nat.eql(x1 - x0, 1))
-    Bits.eql(to_tile, Bits.o(Bits.o(Bits.o(Bits.o(Bits.e)))))
-  ]))
     Bits.eql(Bits.drop(1, from_tile), (Bits.i(Bits.o(Bits.o(Bits.e)))))
     && (Nat.eql(x0 - x1, 1) || Nat.eql(x1 - x0, 1))
     && Bits.eql(to_tile, Bits.o(Bits.o(Bits.o(Bits.o(Bits.e)))))
 
 App.Chess.move.aux_en_passant(x0: Nat, y0: Nat, x1: Nat, y1: Nat, board: App.Chess.Board): App.Chess.Board
   let index = (x1 * 4) + (y0 * 8 * 4)
-  log(Nat.show(index))
-  log(Nat.show(x1) | ", " | Nat.show(y0))
   let chunk = App.Chess.get_chunk(index, board) 
-  log(Bits.show(chunk))
   let new_tile = Bits.o(Bits.o(Bits.o(Bits.o(Bits.e))))
   let chunk = Bits.set(56 - index % 60, new_tile, chunk)
-  log(Bits.show(chunk))
   let new_board = 
     if index <? 60 then
         board[0] <- chunk 
@@ -564,7 +584,7 @@ App.Chess.move.aux_en_passant(x0: Nat, y0: Nat, x1: Nat, y1: Nat, board: App.Che
   new_board
 
 
-App.Chess.in_check(team: Bits, board: App.Chess.Board): Bool
+App.Chess.in_check(team: Bits, board: App.Chess.Board): Pair<Bool, Bits>
   let white_king = Bits.o(Bits.o(Bits.i(Bits.i(Bits.e))))
   let {xw, yw} = App.Chess.find_piece(white_king, board) <> Pair.new!!<8,8>
 
@@ -622,7 +642,6 @@ App.Chess.castle(x1: Nat, y1: Nat, board: App.Chess.Board): App.Chess.Board
   let is_black_king = Bits.eql(piece, Bits.i(Bits.o(Bits.i(Bits.i(Bits.e)))))
   let is_white_king = Bits.eql(piece, Bits.o(Bits.o(Bits.i(Bits.i(Bits.e)))))
   let is_possible   = (i: Nat) Bits.eql(Bits.o(Bits.e), Bits.slice(1, Bits.drop(i, board[4] <> Bits.e)))
-  // log(Bits.show(piece))
   if is_black_king then
     if Nat.eql(x1, 2) && Nat.eql(y1, 0) && is_possible(1) && Bits.eql(piece1, black_rook) then
       App.Chess.castle_move_rook(0, 0, 3, 0, board)
@@ -728,15 +747,26 @@ App.Chess.find_piece_aux(index: Nat, piece: Bits, board: App.Chess.Board) : Mayb
   else
     App.Chess.find_piece_aux(index + 4, piece, board)
 
-App.Chess.is_attacked(x0: Nat, y0: Nat, board: App.Chess.Board): Bool
+App.Chess.is_attacked(x0: Nat, y0: Nat, board: App.Chess.Board): Pair<Bool, Bits>
   let line     = App.Chess.is_attacked_line(x0, y0, board) 
   let diagonal = App.Chess.is_attacked_diagonal(x0, y0, board) 
   let knight   = App.Chess.is_attacked_knight(x0, y0, board)
   let pawn     = App.Chess.is_attacked_pawn(x0, y0, board)
   let king     = App.Chess.is_attacked_king(x0, y0, board)
-  line || diagonal || knight || pawn || king 
+  log("line:     " |Bool.show(line@fst))
+  log("diagonal: " |Bool.show(diagonal@fst))
+  log("knight:   " |Bool.show(knight@fst))
+  log("pawn:     " |Bool.show(pawn@fst))
+  log("king: " |Bool.show(king@fst))
+  switch Bool.eql(true) {
+    line@fst:     line
+    diagonal@fst: diagonal
+    knight@fst:   knight
+    pawn@fst:     pawn
+    king@fst:     king
+  } default {false, Bits.e}
 
-App.Chess.is_attacked_line(x0: Nat, y0: Nat, board: App.Chess.Board): Bool
+App.Chess.is_attacked_line(x0: Nat, y0: Nat, board: App.Chess.Board): Pair<Bool, Bits>
   let id    = (a: Int) a 
   let add   = (a: Int) Int.add(a, 1)
   let sub   = (a: Int) Int.sub(a, 1)
@@ -746,23 +776,32 @@ App.Chess.is_attacked_line(x0: Nat, y0: Nat, board: App.Chess.Board): Bool
   let down  = App.Chess.is_attacked_line_aux(x0, y0, x1, y1 + 1, id, add, board)
   let left  = App.Chess.is_attacked_line_aux(x0, y0, x1 - 1, y1, sub, id, board)
   let right = App.Chess.is_attacked_line_aux(x0, y0, x1 + 1, y1, add, id, board)
-  up || down || left || right
+  switch Bool.eql(true) {
+    up@fst:    up
+    down@fst:  down
+    left@fst:  left
+    right@fst: right
+  } default {false, Bits.e}
 
-App.Chess.is_attacked_line_aux(x0: Nat, y0: Nat, x1: Int, y1: Int, fx: Int -> Int, fy: Int -> Int, board: App.Chess.Board): Bool 
+App.Chess.is_attacked_line_aux(x0: Nat, y0: Nat, x1: Int, y1: Int, fx: Int -> Int, fy: Int -> Int, board: App.Chess.Board): Pair<Bool, Bits> 
+   let tile = Bits.drop(1, App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board))
   if Int.ltn(y1, 0) || Int.gtn(y1, 7) || Int.ltn(x1, 0) || Int.gtn(x1, 7) then
-    false      
+    {false, Bits.e}      
   else
     if Bits.eql(App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board), Bits.o(Bits.o(Bits.o(Bits.o(Bits.e))))) then
       App.Chess.is_attacked_line_aux(x0, y0, fx(x1), fy(y1),fx, fy, board)
     else 
       if Bits.eql(Bits.slice(1, App.Chess.get(x0, y0, board)), Bits.slice(1, App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board))) then
-        false
-      else
-        Bits.eql(Bits.drop(1, App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board)), Bits.i(Bits.o(Bits.i(Bits.e))))
-        || Bits.eql(Bits.drop(1, App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board)), Bits.o(Bits.i(Bits.o(Bits.e))))
+        {false, Bits.e}
+       else
+        let rook  = Bits.o(Bits.i(Bits.o(Bits.e)))
+        let queen = Bits.i(Bits.o(Bits.i(Bits.e)))
+        if Bits.eql(tile, queen) || Bits.eql(tile, rook) then
+          {true, Bits.concat(Nat.to_bits(Int.to_nat(x1)), Nat.to_bits(Int.to_nat(y1)))}
+        else
+          {false, Bits.e} 
 
-
-App.Chess.is_attacked_diagonal(x0: Nat, y0: Nat, board: App.Chess.Board): Bool
+App.Chess.is_attacked_diagonal(x0: Nat, y0: Nat, board: App.Chess.Board): Pair<Bool, Bits>
   let add = (a: Int) Int.add(a, 1)
   let sub = (a: Int) Int.sub(a, 1)
   let x1  = Nat.to_int(x0)
@@ -771,25 +810,35 @@ App.Chess.is_attacked_diagonal(x0: Nat, y0: Nat, board: App.Chess.Board): Bool
   let q2  = App.Chess.is_attacked_diagonal_aux(x0, y0, x1 - 1, y1 - 1, sub, sub, board) 
   let q3  = App.Chess.is_attacked_diagonal_aux(x0, y0, x1 - 1, y1 + 1, sub, add, board) 
   let q4  = App.Chess.is_attacked_diagonal_aux(x0, y0, x1 + 1, y1 + 1, add, add, board) 
-  q1 || q2 || q3 || q4
+  switch Bool.eql(true) {
+    q1@fst: q1
+    q2@fst: q2
+    q3@fst: q3
+    q4@fst: q4
+  } default {false, Bits.e}
 
-App.Chess.is_attacked_diagonal_aux(x0: Nat, y0: Nat, x1: Int, y1: Int, fx: Int -> Int, fy:  Int -> Int, board: App.Chess.Board): Bool
+App.Chess.is_attacked_diagonal_aux(x0: Nat, y0: Nat, x1: Int, y1: Int, fx: Int -> Int, fy:  Int -> Int, board: App.Chess.Board): Pair<Bool, Bits>
   let tile = App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board)
   if Int.ltn(x1, 0) || Int.ltn(y1, 0) || Int.gtn(x1, 7) || Int.gtn(y1, 7) then
-    false      
+    {false, Bits.e}      
   else
     if Bits.eql(tile, Bits.o(Bits.o(Bits.o(Bits.o(Bits.e))))) then
       App.Chess.is_attacked_diagonal_aux(x0, y0, fx(x1), fy(y1), fx, fy, board)
     else 
       if Bits.eql(Bits.slice(1, App.Chess.get(x0, y0, board)), Bits.slice(1, tile)) then
-        false
+        {false, Bits.e}
       else
-        Bits.eql(Bits.drop(1, tile), Bits.o(Bits.o(Bits.i(Bits.e))))
-        || Bits.eql(Bits.drop(1, tile), Bits.i(Bits.o(Bits.i(Bits.e))))
+        if Bits.eql(Bits.drop(1, tile), Bits.o(Bits.o(Bits.i(Bits.e))))
+        || Bits.eql(Bits.drop(1, tile), Bits.i(Bits.o(Bits.i(Bits.e)))) then
+          {true, Bits.concat(Nat.to_bits(Int.to_nat(x1)), Nat.to_bits(Int.to_nat(y1)))}
+        else
+          {false, Bits.e}
 
-App.Chess.is_attacked_knight(x0: Nat, y0: Nat, board: App.Chess.Board): Bool 
+App.Chess.is_attacked_knight(x0: Nat, y0: Nat, board: App.Chess.Board): Pair<Bool, Bits> 
   let x1 = Nat.to_int(x0)
   let y1 = Nat.to_int(y0)
+  log(Int.show(x1 + 2))
+  log(Int.show(y1 + 2))
   let aux1 = App.Chess.is_attacked_knight_aux(x0, y0, x1 + 1, y1 + 2, board)
   let aux2 = App.Chess.is_attacked_knight_aux(x0, y0, x1 + 1, y1 - 2, board)
   let aux3 = App.Chess.is_attacked_knight_aux(x0, y0, x1 - 1, y1 + 2, board)
@@ -798,50 +847,80 @@ App.Chess.is_attacked_knight(x0: Nat, y0: Nat, board: App.Chess.Board): Bool
   let aux6 = App.Chess.is_attacked_knight_aux(x0, y0, x1 + 2, y1 - 1, board)
   let aux7 = App.Chess.is_attacked_knight_aux(x0, y0, x1 - 2, y1 + 1, board)
   let aux8 = App.Chess.is_attacked_knight_aux(x0, y0, x1 - 2, y1 - 1, board)
-  aux1 || aux2 || aux3 || aux4 || aux5 || aux6 || aux7 || aux8
+  switch Bool.eql(true) {
+    aux1@fst: aux1
+    aux2@fst: aux2
+    aux3@fst: aux3
+    aux4@fst: aux4
+    aux5@fst: aux5
+    aux6@fst: aux6
+    aux7@fst: aux7
+    aux8@fst: aux8
+  } default {false, Bits.e}
 
-App.Chess.is_attacked_knight_aux(x0: Nat, y0: Nat, x1: Int, y1: Int, board: App.Chess.Board): Bool
-  if Bits.eql(App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board), Bits.o(Bits.o(Bits.o(Bits.o(Bits.e))))) then  
-    false
-  else 
-    if Bits.eql(Bits.slice(1, App.Chess.get(x0, y0, board)), Bits.slice(1, App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board))) then 
-      false
+App.Chess.is_attacked_knight_aux(x0: Nat, y0: Nat, x1: Int, y1: Int, board: App.Chess.Board): Pair<Bool, Bits>
+  if Int.ltn(x1, 0) || Int.gtn(x1, 7) || Int.gtn(y1, 7) || Int.ltn(y1,0)then
+    {false, Bits.e}
+  else
+    if Bits.eql(App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board), Bits.o(Bits.o(Bits.o(Bits.o(Bits.e))))) then  
+      {false, Bits.e}
+    else 
+      if Bits.eql(Bits.slice(1, App.Chess.get(x0, y0, board)), Bits.slice(1, App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board))) then 
+        {false, Bits.e}
     else
-      Bits.eql(Bits.drop(1, App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board)), Bits.i(Bits.i(Bits.o(Bits.e))))
+        if Bits.eql(Bits.drop(1, App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board)), Bits.i(Bits.i(Bits.o(Bits.e)))) then
+          {true, Bits.concat(Nat.to_bits(Int.to_nat(x1)), Nat.to_bits(Int.to_nat(y1)))}
+        else
+          {false, Bits.e}
 
-App.Chess.is_attacked_pawn(x0: Nat, y0: Nat, board: App.Chess.Board): Bool
+App.Chess.is_attacked_pawn(x0: Nat, y0: Nat, board: App.Chess.Board): Pair<Bool, Bits>
   if Bits.eql(Bits.slice(1, App.Chess.get(x0, y0, board)), Bits.o(Bits.e)) then
     App.Chess.is_attacked_pawn_white(x0, y0, board)
   else
     App.Chess.is_attacked_pawn_black(x0, y0, board)
 
-App.Chess.is_attacked_pawn_white(x0: Nat, y0: Nat, board: App.Chess.Board): Bool
+App.Chess.is_attacked_pawn_white(x0: Nat, y0: Nat, board: App.Chess.Board): Pair<Bool, Bits>
   let tile1 = App.Chess.get(x0 - 1, y0 - 1, board)
   let tile2 = App.Chess.get(x0 + 1, y0 - 1, board)
   let black_pawn = Bits.i(Bits.i(Bits.o(Bits.o(Bits.e))))
-  Bits.eql(tile1, black_pawn) || Bits.eql(tile2, black_pawn)
+  if Bits.eql(tile1, black_pawn) then
+    {true, Bits.concat(Nat.to_bits(x0 - 1), Nat.to_bits(y0 - 1))}
+  else 
+    if Bits.eql(tile2, black_pawn) then
+      {true, Bits.concat(Nat.to_bits(x0 + 1), Nat.to_bits(y0 - 1))}
+    else
+      {false, Bits.e}
 
-App.Chess.is_attacked_pawn_black(x0: Nat, y0: Nat, board: App.Chess.Board): Bool
+App.Chess.is_attacked_pawn_black(x0: Nat, y0: Nat, board: App.Chess.Board): Pair<Bool, Bits>
   let tile1 = App.Chess.get(x0 - 1, y0 + 1, board)
   let tile2 = App.Chess.get(x0 + 1, y0 + 1, board)
   let white_pawn = Bits.o(Bits.i(Bits.o(Bits.o(Bits.e))))
-  Bits.eql(tile1, white_pawn) || Bits.eql(tile2, white_pawn)
+  if Bits.eql(tile1, white_pawn) then
+    {true, Bits.concat(Nat.to_bits(x0 - 1), Nat.to_bits(y0 - 1))}
+  else 
+    if Bits.eql(tile2, white_pawn) then
+      {true, Bits.concat(Nat.to_bits(x0 + 1), Nat.to_bits(y0 - 1))}
+    else
+      {false, Bits.e}
 
-App.Chess.is_attacked_king(x0: Nat, y0: Nat, board: App.Chess.Board): Bool
+App.Chess.is_attacked_king(x0: Nat, y0: Nat, board: App.Chess.Board): Pair<Bool, Bits>
   let team     = Bits.slice(1, App.Chess.get(x0, y0, board))
   let get_tile = (x: Int, y: Int) App.Chess.get(Int.to_nat(x), Int.to_nat(y), board)
   let king     = Bits.concat(Bits.not(team), Bits.o(Bits.i(Bits.i(Bits.e))))
   let x = Nat.to_int(x0)
   let y = Nat.to_int(y0)
 
-  Bits.eql(get_tile(x - 1, y - 1), king) ||
-  Bits.eql(get_tile(x    , y - 1), king) ||
-  Bits.eql(get_tile(x + 1, y - 1), king) ||
-  Bits.eql(get_tile(x - 1, y    ), king) ||
-  Bits.eql(get_tile(x + 1, y    ), king) ||
-  Bits.eql(get_tile(x - 1, y + 1), king) ||
-  Bits.eql(get_tile(x    , y + 1), king) ||
-  Bits.eql(get_tile(x + 1, y + 1), king) 
+  let test =
+    Bits.eql(get_tile(x - 1, y - 1), king) ||
+    Bits.eql(get_tile(x    , y - 1), king) ||
+    Bits.eql(get_tile(x + 1, y - 1), king) ||
+    Bits.eql(get_tile(x - 1, y    ), king) ||
+    Bits.eql(get_tile(x + 1, y    ), king) ||
+    Bits.eql(get_tile(x - 1, y + 1), king) ||
+    Bits.eql(get_tile(x    , y + 1), king) ||
+    Bits.eql(get_tile(x + 1, y + 1), king) 
+  {test, Bits.e}
+
 
 App.Chess.mouse_to_coord(mouse_pos: Pair<U32, U32>): Pair<Nat, Nat>
   let scale     = App.Chess.scale
