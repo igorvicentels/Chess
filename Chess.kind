@@ -13,7 +13,7 @@ App.Chess.Board: Type
   List<Bits>
 
 App.Chess.room: String
-  "Chess_Room_354"
+  "Chess_Room_358964"
 
 App.Chess.scale: U32
   2
@@ -138,15 +138,15 @@ App.Chess.next_player(board: App.Chess.Board): Bits
     let last_bit = Bits.slice(1, board[4] <> Bits.e)
     last_bit
 
-App.Chess.is_move_possible(x0: Nat, y0: Nat, x1: Nat, y1: Nat, team: Bits, board: App.Chess.Board): Bool
+App.Chess.is_move_possible(x0: Nat, y0: Nat, x1: Int, y1: Int, team: Bits, board: App.Chess.Board): Bool
   let origin_tile          = App.Chess.get(x0, y0, board) <> Bits.e
-  let to_tile              = App.Chess.get(x1, y1, board) <> Bits.e
+  let to_tile              = App.Chess.get(Int.to_nat(x1), Int.to_nat(y1), board) <> Bits.e
   let player               = App.Chess.next_player(board)
   let is_origin_tile_empty = Bits.eql(origin_tile, Bits.o(Bits.o(Bits.o(Bits.o(Bits.e)))))
   if is_origin_tile_empty then
     false
   else      
-    if Nat.ltn(x1, 0) || Nat.ltn(y1, 0) || Nat.gtn(x1, 7) || Nat.gtn(y1, 7) then
+    if Int.ltn(x1, 0) || Int.ltn(y1, 0) || Int.gtn(x1, 7) || Int.gtn(y1, 7) then
       false
     else
       let piece_owner       = Bits.slice(1, origin_tile)
@@ -164,6 +164,8 @@ App.Chess.is_move_possible(x0: Nat, y0: Nat, x1: Nat, y1: Nat, team: Bits, board
       // log(List.show!(Bool.show, [is_piece_owner, is_user_turn, (is_to_tile_empty || Bool.not(is_to_tile_player))]))
 
       if (is_user_turn && is_piece_owner) && (is_to_tile_empty || Bool.not(is_to_tile_player)) then
+        let x1 = Int.to_nat(x1)
+        let y1 = Int.to_nat(y1)
         switch Bits.eql(Bits.drop(1, origin_tile)) {
           pawn:   
             App.Chess.is_move_possible_pawn(x0, y0, x1, y1, is_to_tile_empty, piece_owner, board) ||
@@ -171,13 +173,13 @@ App.Chess.is_move_possible(x0: Nat, y0: Nat, x1: Nat, y1: Nat, team: Bits, board
           rook:   
             App.Chess.is_move_possible_line(x0, y0, x1, y1, origin_tile, board)
           knight: 
-            App.Chess.is_move_possible_knight(Nat.to_int(x0), Nat.to_int(y0), Nat.to_int(x1), Nat.to_int(y1), board)
+            App.Chess.is_move_possible_knight(x0, y0, x1, y1, board)
           bishop: 
             App.Chess.is_move_possible_line(x0, y0, x1, y1, origin_tile, board)
           queen:  
             App.Chess.is_move_possible_line(x0, y0, x1, y1, origin_tile, board)
           king:   
-            App.Chess.is_move_possible_king(Nat.to_int(x0), Nat.to_int(y0), Nat.to_int(x1), Nat.to_int(y1), board) ||
+            App.Chess.is_move_possible_king(x0, y0, x1, y1, board) ||
             App.Chess.is_castle_possible(x0, y0, x1, y1, board)
           
         } default false
@@ -319,11 +321,19 @@ board: App.Chess.Board     // Board
       false
 
 
-App.Chess.is_move_possible_knight(x0: Int, y0: Int, x1: Int, y1: Int, board: App.Chess.Board): Bool
+App.Chess.is_move_possible_knight(x0: Nat, y0: Nat, x1: Nat, y1: Nat, board: App.Chess.Board): Bool
+  let x0 = Nat.to_int(x0)
+  let y0 = Nat.to_int(y0)
+  let x1 = Nat.to_int(x1)
+  let y1 = Nat.to_int(y1)
   (Nat.eql(Int.abs(x0 - x1), 2) && Nat.eql(Int.abs(y0 - y1), 1)) || (Nat.eql(Int.abs(x0 - x1), 1) && Nat.eql(Int.abs(y0 - y1), 2))
 
 
-App.Chess.is_move_possible_king(x0: Int, y0: Int, x1: Int, y1: Int, board: App.Chess.Board): Bool
+App.Chess.is_move_possible_king(x0: Nat, y0: Nat, x1: Nat, y1: Nat, board: App.Chess.Board): Bool
+  let x0 = Nat.to_int(x0)
+  let y0 = Nat.to_int(y0)
+  let x1 = Nat.to_int(x1)
+  let y1 = Nat.to_int(y1)  
   Nat.lte(Int.abs(x0 - x1), 1) && Nat.lte(Int.abs(y0 - y1), 1)
 
 App.Chess.is_checkmate(board: App.Chess.Board): Bool
@@ -482,7 +492,7 @@ App.Chess.is_checkmate.king_move(x0: Nat, y0: Nat, x1: Int, y1: Int, team: Bits,
   if Int.ltn(x1, 0) || Int.ltn(y1, 0) then 
     true
   else
-    let is_possible = App.Chess.is_move_possible(x0, y0, Int.to_nat(x1), Int.to_nat(y1), team, board)
+    let is_possible = App.Chess.is_move_possible(x0, y0, x1, y1, team, board)
     let move        = App.Chess.move.aux(x0, y0, Int.to_nat(x1), Int.to_nat(y1), team, board)
     let still_check = Maybe.is_some!(App.Chess.in_check(team, move))    
     Bool.not(is_possible) || still_check
@@ -494,7 +504,7 @@ App.Chess.move(code: Bits, board: App.Chess.Board): Maybe<App.Chess.Board>
   let y0   = Bits.slice(3,Bits.drop(4,code))
   let x1   = Bits.slice(3,Bits.drop(7,code))
   let y1   = Bits.slice(3,Bits.drop(10,code))
-  let is_possible = App.Chess.is_move_possible(Bits.to_nat(x0), Bits.to_nat(y0), Bits.to_nat(x1), Bits.to_nat(y1), team, board)
+  let is_possible = App.Chess.is_move_possible(Bits.to_nat(x0), Bits.to_nat(y0), Nat.to_int(Bits.to_nat(x1)), Nat.to_int(Bits.to_nat(y1)), team, board)
   if is_possible then 
     let new_board = App.Chess.move.aux(Bits.to_nat(x0), Bits.to_nat(y0), Bits.to_nat(x1), Bits.to_nat(y1), team, board)      
     let still_check =  Maybe.is_some!(App.Chess.in_check(team, new_board))    
@@ -1044,7 +1054,7 @@ App.Chess.can_move_king(x0: Nat, y0: Nat, x1: Int, y1: Int, team: Bits, board: A
   if Int.ltn(x1, 0) || Int.ltn(y1, 0) then 
     false
   else
-    let is_possible = App.Chess.is_move_possible(x0, y0, Int.to_nat(x1), Int.to_nat(y1), team, board)
+    let is_possible = App.Chess.is_move_possible(x0, y0, x1, y1, team, board)
     let move        = App.Chess.move.aux(x0, y0, Int.to_nat(x1), Int.to_nat(y1), team, board)
     let still_check = Maybe.is_some!(App.Chess.in_check(team, move))    
     is_possible && Bool.not(still_check)
@@ -1094,10 +1104,11 @@ App.Chess.test_piece_pawn(index: Nat, board: App.Chess.Board): Bool
     let f = if Bits.eql(Bits.slice(1, pawn), Bits.o(Bits.e)) then Nat.sub else Nat.add
     log("teste: " | Nat.show(f(y,1)))
     log("teste: " | Nat.show(f(y,2)))
-    let is_possible1 = App.Chess.is_move_possible(x, y, x    , f(y, 1), team, board)
-    let is_possible2 = App.Chess.is_move_possible(x, y, x    , f(y, 2), team, board)
-    let is_possible3 = App.Chess.is_move_possible(x, y, x - 1, f(y, 1), team, board)
-    let is_possible4 = App.Chess.is_move_possible(x, y, x + 1, f(y, 1), team, board)
+    let x1 = Nat.to_int(x)
+    let is_possible1 = App.Chess.is_move_possible(x, y, x1    , Nat.to_int(f(y, 1)), team, board)
+    let is_possible2 = App.Chess.is_move_possible(x, y, x1    , Nat.to_int(f(y, 2)), team, board)
+    let is_possible3 = App.Chess.is_move_possible(x, y, x1 - 1, Nat.to_int(f(y, 1)), team, board)
+    let is_possible4 = App.Chess.is_move_possible(x, y, x1 + 1, Nat.to_int(f(y, 1)), team, board)
 
     let is_check1 = 
       let move = App.Chess.move.aux(x, y, x, f(y, 1), team, board)
@@ -1133,15 +1144,17 @@ App.Chess.test_piece_knight(index: Nat, board: App.Chess.Board): Bool
   log("knight")
   log("pos - x: " | Nat.show(x) | "   y: " | Nat.show(y)) // Check if i should use int to avoid problems at the 0edges
   let team = App.Chess.next_player(board)
+  let x1 = Nat.to_int(x)
+  let y1 = Nat.to_int(y)
   let can_move =
-    let is_possible1 = App.Chess.is_move_possible(x, y, x + 2, y + 1, team, board)
-    let is_possible2 = App.Chess.is_move_possible(x, y, x + 2, y - 1, team, board)
-    let is_possible3 = App.Chess.is_move_possible(x, y, x - 2, y + 1, team, board)
-    let is_possible4 = App.Chess.is_move_possible(x, y, x - 2, y - 1, team, board)
-    let is_possible5 = App.Chess.is_move_possible(x, y, x + 1, y + 2, team, board)
-    let is_possible6 = App.Chess.is_move_possible(x, y, x + 1, y - 2, team, board)
-    let is_possible7 = App.Chess.is_move_possible(x, y, x - 1, y + 2, team, board)
-    let is_possible8 = App.Chess.is_move_possible(x, y, x - 1, y - 2, team, board)
+    let is_possible1 = App.Chess.is_move_possible(x, y, x1 + 2, y1 + 1, team, board)
+    let is_possible2 = App.Chess.is_move_possible(x, y, x1 + 2, y1 - 1, team, board)
+    let is_possible3 = App.Chess.is_move_possible(x, y, x1 - 2, y1 + 1, team, board)
+    let is_possible4 = App.Chess.is_move_possible(x, y, x1 - 2, y1 - 1, team, board)
+    let is_possible5 = App.Chess.is_move_possible(x, y, x1 + 1, y1 + 2, team, board)
+    let is_possible6 = App.Chess.is_move_possible(x, y, x1 + 1, y1 - 2, team, board)
+    let is_possible7 = App.Chess.is_move_possible(x, y, x1 - 1, y1 + 2, team, board)
+    let is_possible8 = App.Chess.is_move_possible(x, y, x1 - 1, y1 - 2, team, board)
 
     let is_check1 =
       let move = App.Chess.move.aux(x, y, x + 2, y + 1, team, board)
@@ -1250,7 +1263,7 @@ App.Chess.test_piece.recursive(x: Int, y: Int, fx: Int -> Int, fy: Int -> Int, t
   if Int.ltn(x1, 0) || Int.ltn(y1, 0) || Int.gtn(x1, 7) || Int.gtn(y1, 7) then
     false
   else
-    let is_possible = App.Chess.is_move_possible(Int.to_nat(x), Int.to_nat(y), Int.to_nat(x1), Int.to_nat(y1), team, board)
+    let is_possible = App.Chess.is_move_possible(Int.to_nat(x), Int.to_nat(y), x1, y1, team, board)
     if is_possible then
       let is_check = 
         let move = App.Chess.move.aux(Int.to_nat(x), Int.to_nat(y), Int.to_nat(x1), Int.to_nat(y1), team, board)
