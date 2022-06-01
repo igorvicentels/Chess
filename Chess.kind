@@ -1070,16 +1070,15 @@ App.Chess.test_piece.go(index: Nat, board: App.Chess.Board): Bool
   else
     if Bits.eql(tile, empty_tile) || Bool.not(Bits.eql(Bits.slice(1, tile), team)) then
       log("empty or wrong team")
-      log("team: " | Bits.show(team))
       App.Chess.test_piece.go(index + 4, board)
     else
       log("else")
       switch Bits.eql(Bits.drop(1, tile)) {
-        pawn: App.Chess.test_piece_pawn(index, board)
-        rook:  App.Chess.test_piece.go(index + 4, board)
+        pawn:   App.Chess.test_piece_pawn(index, board)
+        rook:   App.Chess.test_piece_rook(index, board)
         knight: App.Chess.test_piece_knight(index, board)
-        bishop: App.Chess.test_piece.go(index + 4, board)
-        queen: App.Chess.test_piece.go(index + 4, board)
+        bishop: App.Chess.test_piece_bishop(index, board)
+        queen:  App.Chess.test_piece_rook(index, board) || App.Chess.test_piece_bishop(index, board)
         // king: App.Chess.test_piece.go(index + 4, board)
       } default  App.Chess.test_piece.go(index + 4, board)
 
@@ -1089,7 +1088,7 @@ App.Chess.test_piece_pawn(index: Nat, board: App.Chess.Board): Bool
   let team = App.Chess.next_player(board) // TODO: checar se é melhor passar o team como parametro
   let pawn = App.Chess.get(x, y, board) <> Bits.e
   log("pawn")
-  log("pos - x: " | Nat.show(x) | "   y: " | Nat.show(y))
+  log("pos - x: " | Nat.show(x) | "   y: " | Nat.show(y)) // TODO: check if the only solution for the edges is change the is_move_possible type
   // TODO: Check if the is_possible need to be verified before the is_check
   let can_move = 
     let f = if Bits.eql(Bits.slice(1, pawn), Bits.o(Bits.e)) then Nat.sub else Nat.add
@@ -1196,6 +1195,72 @@ App.Chess.test_piece_knight(index: Nat, board: App.Chess.Board): Bool
 
   if can_move then true else App.Chess.test_piece.go(index + 4, board)
 
+App.Chess.test_piece_rook(index: Nat, board: App.Chess.Board): Bool
+  let x    = (index / 4) % 8
+  let y    = index / 32
+  let team = App.Chess.next_player(board) // TODO: checar se é melhor passar o team como parametro
+  let rook = App.Chess.get(x, y, board) <> Bits.e
+  let x = Nat.to_int(x)
+  let y = Nat.to_int(y)
+  log("rook")
+  log("pos - x: " |Int.show(x) | "   y: " |Int.show(y))
+  let add = (a: Int) Int.add(a, 1)
+  let sub = (a: Int) Int.sub(a, 1)
+  let id  = (a: Int) a
+  let can_move =
+    let up    = App.Chess.test_piece.recursive(x, y,  id, sub, team, board)
+    let down  = App.Chess.test_piece.recursive(x, y,  id, add, team, board)
+    let left  = App.Chess.test_piece.recursive(x, y, sub,  id, team, board)
+    let right = App.Chess.test_piece.recursive(x, y, add,  id, team, board)
+    log("up:    " | Bool.show(up))
+    log("down:  " | Bool.show(down))
+    log("left:  " | Bool.show(left))
+    log("right: " | Bool.show(right))
+    up || down || left || right
+
+  can_move
+
+App.Chess.test_piece_bishop(index: Nat, board: App.Chess.Board): Bool
+  let x    = (index / 4) % 8
+  let y    = index / 32
+  let team = App.Chess.next_player(board) // TODO: checar se é melhor passar o team como parametro
+  let rook = App.Chess.get(x, y, board) <> Bits.e
+  let x = Nat.to_int(x)
+  let y = Nat.to_int(y)
+  log("bishop")
+  log("pos - x: " |Int.show(x) | "   y: " |Int.show(y))
+  let add = (a: Int) Int.add(a, 1)
+  let sub = (a: Int) Int.sub(a, 1)
+  let can_move =
+    let q1 = App.Chess.test_piece.recursive(x, y, add, sub, team, board)
+    let q2 = App.Chess.test_piece.recursive(x, y, sub, sub, team, board)
+    let q3 = App.Chess.test_piece.recursive(x, y, sub, add, team, board)
+    let q4 = App.Chess.test_piece.recursive(x, y, add, add, team, board)
+    log("q1: " | Bool.show(q1))
+    log("q2: " | Bool.show(q2))
+    log("q3: " | Bool.show(q3))
+    log("q4: " | Bool.show(q4))
+    q1 || q2 || q3 || q4
+
+  can_move
+
+App.Chess.test_piece.recursive(x: Int, y: Int, fx: Int -> Int, fy: Int -> Int, team: Bits, board: App.Chess.Board): Bool
+  let x1 = fx(x)
+  let y1 = fy(y) 
+  if Int.ltn(x1, 0) || Int.ltn(y1, 0) || Int.gtn(x1, 7) || Int.gtn(y1, 7) then
+    false
+  else
+    let is_possible = App.Chess.is_move_possible(Int.to_nat(x), Int.to_nat(y), Int.to_nat(x1), Int.to_nat(y1), team, board)
+    if is_possible then
+      let is_check = 
+        let move = App.Chess.move.aux(Int.to_nat(x), Int.to_nat(y), Int.to_nat(x1), Int.to_nat(y1), team, board)
+        Maybe.is_some!(App.Chess.in_check(team, move))
+      if is_check then
+        App.Chess.test_piece.recursive(x1, y1, fx, fy, team, board)
+      else
+        true
+    else
+      false
 
 App.Chess.mouse_to_coord(mouse_pos: Pair<U32, U32>): Pair<Nat, Nat>
   let scale     = App.Chess.scale
