@@ -13,7 +13,7 @@ App.Chess.Board: Type
   List<Bits>
 
 App.Chess.room: String
-  "Chess_Room_403"
+  "Chess_Room_410"
 
 App.Chess.scale: U32
   2
@@ -27,6 +27,8 @@ App.Chess.tile_size: U32
 // 000000000000000000000000000000000000000000000000000000000000
 // 000000000000001000100010001000100010001000100100011010001010
 // 110010000110010000000000000000000000000000000000000000000000
+//                                   27                       15                            9                5            1
+// 110010000110010000000000000000000 000000000000(last move)  000000(turns without capture) 0000(en passant) 0000(castle) 0(team)
 
 // empty        -> 0000
 // black pawn   -> 0011
@@ -245,13 +247,13 @@ App.Chess.is_move_possible_en_passant(x0: Nat, y0: Nat, x1: Nat, y1: Nat, is_to_
     && Nat.eql(y0, 3)
     && Nat.eql(y1, 2) 
     && (Nat.eql(x0 - x1, 1) || Nat.eql(x1 - x0, 1))
-    && Nat.eql(Bits.to_nat(Bits.slice(4, Bits.drop(8, board[4] <> Bits.e))) - 1, x1)
+    && Nat.eql(Bits.to_nat(Bits.slice(4, Bits.drop(5, board[4] <> Bits.e))) - 1, x1)
   else
     is_to_tile_empty 
     && Nat.eql(y0, 4)
     && Nat.eql(y1, 5) 
     && (Nat.eql(x0 - x1, 1) || Nat.eql(x1 - x0, 1))
-    && Nat.eql(Bits.to_nat(Bits.slice(4, Bits.drop(8, board[4] <> Bits.e))) - 1, x1)
+    && Nat.eql(Bits.to_nat(Bits.slice(4, Bits.drop(5, board[4] <> Bits.e))) - 1, x1)
 
 App.Chess.is_move_possible_pawn(x0: Nat, y0: Nat, x1: Nat, y1: Nat, is_to_tile_empty: Bool, piece_owner: Bits, board: App.Chess.Board) : Bool
   if Bits.eql(piece_owner, Bits.o(Bits.e)) then
@@ -402,10 +404,10 @@ App.Chess.is_checkmate(board: App.Chess.Board): Bool
       log("capture_attacker: " | Bool.show(can_capture_attacker))
 
       let double_check =
-        let x0 =  Bits.to_nat(Bits.slice(3,Bits.drop(13, board[4] <> Bits.e)))
-        let y0 =  Bits.to_nat(Bits.slice(3,Bits.drop(16, board[4] <> Bits.e)))
-        let x1 =  Bits.to_nat(Bits.slice(3,Bits.drop(19, board[4] <> Bits.e)))
-        let y1 =  Bits.to_nat(Bits.slice(3,Bits.drop(22, board[4] <> Bits.e)))
+        let x0 =  Bits.to_nat(Bits.slice(3,Bits.drop(15, board[4] <> Bits.e)))
+        let y0 =  Bits.to_nat(Bits.slice(3,Bits.drop(18, board[4] <> Bits.e)))
+        let x1 =  Bits.to_nat(Bits.slice(3,Bits.drop(21, board[4] <> Bits.e)))
+        let y1 =  Bits.to_nat(Bits.slice(3,Bits.drop(24, board[4] <> Bits.e)))
         
         if x1 =? xk then 
           if y0 =? y1 then
@@ -573,9 +575,8 @@ App.Chess.move.aux(x0: Nat, y0: Nat, x1: Nat, y1: Nat, team: Bits, board: App.Ch
       new_board
 
   let last_chunk = new_board[4] <> Bits.e
-  let last_chunk = Bits.set(8, set_en_passant, last_chunk) 
+  let last_chunk = Bits.set(5, set_en_passant, last_chunk) 
   let new_board = new_board[4] <- last_chunk
-   
 
   let new_board = App.Chess.castle(x1, y1, new_board)
 
@@ -584,7 +585,7 @@ App.Chess.move.aux(x0: Nat, y0: Nat, x1: Nat, y1: Nat, team: Bits, board: App.Ch
   let next_player = Bits.not(App.Chess.next_player(new_board))
   let last_chunk  = Bits.set(0, next_player, new_board[4] <> Bits.e)
   let last_move   = Bits.concat(Bits.trim(3, Nat.to_bits(x0)), Bits.concat(Bits.trim(3,Nat.to_bits(y0)), Bits.concat(Bits.trim(3, Nat.to_bits(x1)), Bits.trim(3,Nat.to_bits(y1)))))
-  let last_chunk  = Bits.set(13, last_move, last_chunk)
+  let last_chunk  = Bits.set(15, last_move, last_chunk)
   let new_board   = new_board[4] <- last_chunk 
   
   new_board         
@@ -1352,10 +1353,11 @@ App.Chess.when: App.When<App.Chess.State>
     
     key_down:
       log(List.show!((board) Bits.show_reverse(board) |"\n", global))
-      // let is_checkmate = App.Chess.is_checkmate(global)
-      let is_stalemate = App.Chess.is_stalemate(global)
-      // log("Checkmate: "|Bool.show(is_checkmate))
-      log("Stalemate: "|Bool.show(is_stalemate))
+      let is_checkmate = App.Chess.is_checkmate(global)
+      // let is_stalemate = App.Chess.is_stalemate(global)
+      log("Checkmate: "|Bool.show(is_checkmate))
+      // log("Stalemate: "|Bool.show(is_stalemate))
+      log(Bits.show(global[4] <> Bits.e))
       App.pass!
   } default App.pass!
 
