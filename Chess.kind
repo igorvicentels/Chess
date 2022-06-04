@@ -13,7 +13,7 @@ App.Chess.Board: Type
   List<Bits>
 
 App.Chess.room: String
-  "Chess_Room_410"
+  "Chess_Room_415"
 
 App.Chess.scale: U32
   2
@@ -27,8 +27,8 @@ App.Chess.tile_size: U32
 // 000000000000000000000000000000000000000000000000000000000000
 // 000000000000001000100010001000100010001000100100011010001010
 // 110010000110010000000000000000000000000000000000000000000000
-//                                   27                       15                            9                5            1
-// 110010000110010000000000000000000 000000000000(last move)  000000(turns without capture) 0000(en passant) 0000(castle) 0(team)
+//                                  28                       16                            9                5            1
+// 11001000011001000000000000000000 000000000000(last move)  0000000(turns without capture) 0000(en passant) 0000(castle) 0(team)
 
 // empty        -> 0000
 // black pawn   -> 0011
@@ -94,7 +94,7 @@ App.Chess.canvas(local: App.Chess.State.Local, board: App.Chess.Board, img: VoxB
     let is_black_tile = Nat.odd(x + y)
     let draw = VoxBox.Draw.image(((Nat.to_u32(x) * size) - 128) + size / 2, ((Nat.to_u32(y) * size) - 128) + size / 2)
     let draw_tile = VoxBox.Draw.rect(Nat.to_u32(x) * size, Nat.to_u32(y) * size, 0, 64, 64)
-    let img = if not(is_black_tile) then draw_tile(Col32.new(100,100,100,255), img) else draw_tile(Col32.new(255,255,255,255), img)
+    let img = if is_black_tile then draw_tile(Col32.new(100,100,100,255), img) else draw_tile(Col32.new(255,255,255,255), img)
     let tile = App.Chess.get(x, y, board) <> Bits.e
     switch Bits.eql(tile) {
       Bits.o(Bits.o(Bits.o(Bits.o(Bits.e)))): img
@@ -404,10 +404,10 @@ App.Chess.is_checkmate(board: App.Chess.Board): Bool
       log("capture_attacker: " | Bool.show(can_capture_attacker))
 
       let double_check =
-        let x0 =  Bits.to_nat(Bits.slice(3,Bits.drop(15, board[4] <> Bits.e)))
-        let y0 =  Bits.to_nat(Bits.slice(3,Bits.drop(18, board[4] <> Bits.e)))
-        let x1 =  Bits.to_nat(Bits.slice(3,Bits.drop(21, board[4] <> Bits.e)))
-        let y1 =  Bits.to_nat(Bits.slice(3,Bits.drop(24, board[4] <> Bits.e)))
+        let x0 =  Bits.to_nat(Bits.slice(3,Bits.drop(16, board[4] <> Bits.e)))
+        let y0 =  Bits.to_nat(Bits.slice(3,Bits.drop(19, board[4] <> Bits.e)))
+        let x1 =  Bits.to_nat(Bits.slice(3,Bits.drop(22, board[4] <> Bits.e)))
+        let y1 =  Bits.to_nat(Bits.slice(3,Bits.drop(25, board[4] <> Bits.e)))
         
         if x1 =? xk then 
           if y0 =? y1 then
@@ -499,6 +499,10 @@ App.Chess.is_checkmate.king_move(x0: Nat, y0: Nat, x1: Int, y1: Int, team: Bits,
     let still_check = Maybe.is_some!(App.Chess.in_check(team, move))    
     Bool.not(is_possible) || still_check
 
+App.Chess.is_fifty_move(board: App.Chess.Board): Bool
+  let turns_without_capture = Bits.to_nat(Bits.trim(7, (Bits.slice(7, Bits.drop(9, board[4] <> Bits.e)))))
+  Nat.eql(turns_without_capture, 100)
+
 
 App.Chess.move(code: Bits, board: App.Chess.Board): Maybe<App.Chess.Board>
   let team = Bits.slice(1,code)
@@ -585,9 +589,29 @@ App.Chess.move.aux(x0: Nat, y0: Nat, x1: Nat, y1: Nat, team: Bits, board: App.Ch
   let next_player = Bits.not(App.Chess.next_player(new_board))
   let last_chunk  = Bits.set(0, next_player, new_board[4] <> Bits.e)
   let last_move   = Bits.concat(Bits.trim(3, Nat.to_bits(x0)), Bits.concat(Bits.trim(3,Nat.to_bits(y0)), Bits.concat(Bits.trim(3, Nat.to_bits(x1)), Bits.trim(3,Nat.to_bits(y1)))))
-  let last_chunk  = Bits.set(15, last_move, last_chunk)
+  let last_chunk  = Bits.set(16, last_move, last_chunk)
   let new_board   = new_board[4] <- last_chunk 
-  
+
+  // Draw (fifty moves rule)
+  let is_capture = 
+    let to_tile = App.Chess.get(x1, y1, board) <> Bits.e
+    Bool.not(Bits.eql(to_tile, Bits.o(Bits.o(Bits.o(Bits.o(Bits.e))))))
+
+  let is_pawn_move = Bits.eql(Bits.drop(1, from_tile), Bits.i(Bits.o(Bits.o(Bits.e)))) 
+
+  let turns_without_capture = Bits.trim(7, Bits.slice(7, Bits.drop(9, board[4] <> Bits.e)))
+
+  let turns_without_capture = 
+    if is_pawn_move || is_capture then
+      Bits.o(Bits.o(Bits.o(Bits.o(Bits.o(Bits.o(Bits.o(Bits.e)))))))
+    else
+      let n = Bits.to_nat(turns_without_capture)
+      let n = n + 1
+      Bits.trim(7, Nat.to_bits(n))
+
+    let last_chunk  = Bits.set(9, turns_without_capture, new_board[4] <> Bits.e)
+    let new_board   = new_board[4] <- last_chunk 
+
   new_board         
 
 
@@ -1099,7 +1123,7 @@ App.Chess.test_piece_pawn(index: Nat, board: App.Chess.Board): Bool
     log("teste: " | Nat.show(f(y,1)))
     log("teste: " | Nat.show(f(y,2)))
     let x1 = Nat.to_int(x)
-    let is_possible1 = App.Chess.is_move_possible(x, y, x1    , Nat.to_int(f(y, 1)), team, board)
+    let is_possible1 = App.Chess.is_move_possible(x, y, x1   , Nat.to_int(f(y, 1)), team, board)
     let is_possible2 = App.Chess.is_move_possible(x, y, x1   , Nat.to_int(f(y, 2)), team, board)
     let is_possible3 = App.Chess.is_move_possible(x, y, x1 - 1, Nat.to_int(f(y, 1)), team, board)
     let is_possible4 = App.Chess.is_move_possible(x, y, x1 + 1, Nat.to_int(f(y, 1)), team, board)
@@ -1358,6 +1382,8 @@ App.Chess.when: App.When<App.Chess.State>
       log("Checkmate: "|Bool.show(is_checkmate))
       // log("Stalemate: "|Bool.show(is_stalemate))
       log(Bits.show(global[4] <> Bits.e))
+      log("Turns without capture or pawn move: " | Nat.show(Bits.to_nat(Bits.trim(7, (Bits.slice(7, Bits.drop(9, global[4] <> Bits.e)))))))
+      log("Draw (fifty move rule): " | Bool.show(App.Chess.is_fifty_move(global)))
       App.pass!
   } default App.pass!
 
